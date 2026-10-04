@@ -1,0 +1,52 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: API-GATEWAY
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: auth-service
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/api/auth/**
+        - id: exploration-service
+          uri: lb://EXPLORATION-SERVICE
+          predicates:
+            - Path=/api/exploration/**
+        - id: test-service
+          uri: lb://TEST-SERVICE
+          predicates:
+            - Path=/api/tests/**
+        - id: execution-service
+          uri: lb://EXECUTION-SERVICE
+          predicates:
+            - Path=/api/executions/**
+        - id: bug-service
+          uri: lb://BUG-SERVICE
+          predicates:
+            - Path=/api/bugs/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+    registry-fetch-interval-seconds: 3
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: always
