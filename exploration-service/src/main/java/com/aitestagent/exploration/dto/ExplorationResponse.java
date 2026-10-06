@@ -10,6 +10,8 @@ public record ExplorationResponse(
         ExplorationStatus status,
         LocalDateTime startedAt,
         LocalDateTime completedAt,
-        String message
+        String message,
+        /** Plain-text navigation flow summary populated after crawling completes. Null while PENDING/RUNNING. */
+        String navigationFlowSummary
 ) {
 }
