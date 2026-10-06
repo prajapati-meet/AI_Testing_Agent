@@ -1,37 +1,87 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 
-function Dashboard() {
+const Dashboard = () => {
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    const fetchProfile = async () => {
+      try {
+        const response = await api.get('/api/auth/me');
+        setProfile(response.data);
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to fetch profile');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+  };
+
+  if (loading) {
+    return <div className="loading">Loading dashboard...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="page-container" style={{ padding: '2rem' }}>
+        <div className="error-msg">{error}</div>
+        <button onClick={handleLogout} className="logout-btn" style={{ marginTop: '1rem' }}>Logout</button>
+      </div>
+    );
+  }
+
   return (
-    <div className="page-container">
-      <h1>AI Test Agent: Autonomous AI-Based Web Application Testing and Intelligent Bug Reporting</h1>
-      <p className="subtitle">
-        Base Project Dashboard — Ready for autonomous web exploration, AI test generation, Playwright execution, and LLM bug reporting.
-      </p>
+    <div className="page-container" style={{ padding: '2rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h1>Dashboard</h1>
+        <button onClick={handleLogout} className="logout-btn">Logout</button>
+      </div>
+
+      {profile && (
+        <div className="user-info">
+          <h2>Welcome, {profile.name}!</h2>
+          <p>Email: {profile.email}</p>
+          <p>Role: {profile.role}</p>
+        </div>
+      )}
 
       <div className="card-grid">
         <div className="card">
-          <h3>1. Exploration Service</h3>
-          <p>Crawls target web applications via Playwright to extract structured page elements.</p>
-          <span className="badge">Port 8082</span>
+          <h3>Exploration</h3>
+          <p>Analyze and explore test subjects.</p>
         </div>
         <div className="card">
-          <h3>2. Test / AI Service</h3>
-          <p>Generates structured JSON test cases using LangGraph and LLM reasoning.</p>
-          <span className="badge">Port 8083</span>
+          <h3>Test/AI</h3>
+          <p>Generate and manage test cases using AI.</p>
         </div>
         <div className="card">
-          <h3>3. Execution Service</h3>
-          <p>Executes test steps deterministically against the browser via Playwright.</p>
-          <span className="badge">Port 8084</span>
+          <h3>Execution</h3>
+          <p>Run tests and view execution reports.</p>
         </div>
         <div className="card">
-          <h3>4. Bug Analysis Service</h3>
-          <p>Analyzes failed executions using an LLM to produce actionable bug reports.</p>
-          <span className="badge">Port 8085</span>
+          <h3>Bug Analysis</h3>
+          <p>Review and analyze reported bugs.</p>
         </div>
       </div>
     </div>
   );
-}
+};
 
 export default Dashboard;

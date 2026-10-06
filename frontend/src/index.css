@@ -125,3 +125,67 @@ body {
   color: #15803d;
   font-size: 0.9rem;
 }
+
+.error-msg {
+  color: #dc2626;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.success-msg {
+  color: #15803d;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.user-info {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.user-info h2 {
+  margin-bottom: 0.5rem;
+}
+
+.user-info p {
+  color: #475569;
+  margin-bottom: 0.25rem;
+}
+
+.logout-btn {
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.logout-btn:hover {
+  background-color: #b91c1c;
+}
+
+.auth-link {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.auth-link a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.auth-link a:hover {
+  text-decoration: underline;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #475569;
+}
