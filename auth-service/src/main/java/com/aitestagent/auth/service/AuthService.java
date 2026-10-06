@@ -4,9 +4,12 @@ import com.aitestagent.auth.dto.AuthResponse;
 import com.aitestagent.auth.dto.LoginRequest;
 import com.aitestagent.auth.dto.RegisterRequest;
 import com.aitestagent.auth.dto.UserResponse;
-import com.aitestagent.auth.entity.Role;
 import com.aitestagent.auth.entity.User;
+import com.aitestagent.auth.exception.ResourceNotFoundException;
 import com.aitestagent.auth.repository.UserRepository;
+import com.aitestagent.auth.security.JwtUtil;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -17,56 +20,56 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     public AuthResponse register(RegisterRequest request) {
-        Role assignedRole = (request.role() != null) ? request.role() : Role.USER;
-        String email = (request.email() != null) ? request.email() : "user@example.com";
-        String name = (request.name() != null) ? request.name() : "Placeholder User";
-        String rawPassword = (request.password() != null) ? request.password() : "password123";
-
-        User user = new User();
-        user.setName(name);
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(rawPassword));
-        user.setRole(assignedRole);
-        user.setCreatedAt(LocalDateTime.now());
-
-        if (!userRepository.existsByEmail(email)) {
-            userRepository.save(user);
+        if (userRepository.existsByEmail(request.email())) {
+            throw new IllegalArgumentException("Email already taken");
         }
 
-        return new AuthResponse(
-                "placeholder-jwt-token",
-                email,
-                name,
-                assignedRole,
-                "User registration placeholder endpoint succeeded"
-        );
+        User user = new User();
+        user.setName(request.name());
+        user.setEmail(request.email());
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setRole(request.role() != null ? request.role() : com.aitestagent.auth.entity.Role.USER);
+        user.setCreatedAt(LocalDateTime.now());
+
+        userRepository.save(user);
+
+        String token = jwtUtil.generateToken(user.getEmail(), user.getName(), user.getRole());
+
+        return new AuthResponse(token, user.getEmail(), user.getName(), user.getRole(), "Registration successful");
     }
 
     public AuthResponse login(LoginRequest request) {
-        String email = (request.email() != null) ? request.email() : "user@example.com";
-        return new AuthResponse(
-                "placeholder-jwt-token",
-                email,
-                "Placeholder User",
-                Role.USER,
-                "User login placeholder endpoint succeeded"
-        );
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
+
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw new IllegalArgumentException("Invalid email or password");
+        }
+
+        String token = jwtUtil.generateToken(user.getEmail(), user.getName(), user.getRole());
+
+        return new AuthResponse(token, user.getEmail(), user.getName(), user.getRole(), "Login successful");
     }
 
     public UserResponse getCurrentUser() {
-        return new UserResponse(
-                1L,
-                "Placeholder User",
-                "user@example.com",
-                Role.USER,
-                LocalDateTime.now()
-        );
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new ResourceNotFoundException("No authenticated user found");
+        }
+
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        return new UserResponse(user.getId(), user.getName(), user.getEmail(), user.getRole(), user.getCreatedAt());
     }
 }
