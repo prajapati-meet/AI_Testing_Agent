@@ -39,4 +39,33 @@ public class ExecutionController {
     public ResponseEntity<ExecutionResponse> getExecutionById(@PathVariable Long id) {
         return ResponseEntity.ok(executionService.getExecutionById(id));
     }
+
+    @GetMapping("/demo")
+    public ResponseEntity<String> runDemoPoC() {
+        try (com.microsoft.playwright.Playwright playwright = com.microsoft.playwright.Playwright.create()) {
+            com.microsoft.playwright.Browser browser = playwright.chromium().launch(
+                new com.microsoft.playwright.BrowserType.LaunchOptions().setHeadless(true)
+            );
+            com.microsoft.playwright.Page page = browser.newPage();
+            page.navigate("http://localhost:3000");
+            
+            // Wait a moment for React to render the home page
+            page.waitForTimeout(1000);
+            
+            // Make Playwright actually INTERACT with the page by clicking the Products button
+            page.click("text='Browse Products'");
+            
+            // Wait for the Products page to load
+            page.waitForTimeout(1000);
+            
+            String screenshotName = "demo-screenshot-latest.png";
+            page.screenshot(new com.microsoft.playwright.Page.ScreenshotOptions()
+                .setPath(java.nio.file.Paths.get(screenshotName))
+                .setFullPage(true));
+                
+            return ResponseEntity.ok("Successfully navigated to target app, clicked 'Browse Products', and saved screenshot as: " + screenshotName);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error during Playwright execution: " + e.getMessage());
+        }
+    }
 }
