@@ -32,6 +32,14 @@ public class Exploration {
 
     private LocalDateTime completedAt;
 
+    /**
+     * Plain-text navigation flow summary generated after crawling is complete.
+     * This is the field that will eventually be sent to the LLM for test generation.
+     * Stored as TEXT to accommodate large summaries.
+     */
+    @Column(columnDefinition = "TEXT")
+    private String navigationFlowSummary;
+
     public Exploration() {
     }
 
@@ -91,5 +99,13 @@ public class Exploration {
 
     public void setCompletedAt(LocalDateTime completedAt) {
         this.completedAt = completedAt;
+    }
+
+    public String getNavigationFlowSummary() {
+        return navigationFlowSummary;
+    }
+
+    public void setNavigationFlowSummary(String navigationFlowSummary) {
+        this.navigationFlowSummary = navigationFlowSummary;
     }
 }
