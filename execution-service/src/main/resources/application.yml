@@ -26,6 +26,14 @@ eureka:
   instance:
     prefer-ip-address: true
 
+playwright:
+  headless: ${PLAYWRIGHT_HEADLESS:true}
+  screenshots-dir: ${PLAYWRIGHT_SCREENSHOTS_DIR:screenshots}
+
+services:
+  test-service:
+    url: ${TEST_SERVICE_URL:http://TEST-SERVICE/api/tests}
+
 management:
   endpoints:
     web:

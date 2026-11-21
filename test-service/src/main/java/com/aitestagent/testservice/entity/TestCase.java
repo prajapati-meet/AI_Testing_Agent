@@ -30,19 +30,27 @@ public class TestCase {
     @Column(length = 1000)
     private String expectedResult;
 
+    @Column(columnDefinition = "TEXT")
+    private String steps;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     public TestCase() {
     }
 
-    public TestCase(Long id, String name, String description, String priority, String expectedResult, LocalDateTime createdAt) {
+    public TestCase(Long id, String name, String description, String priority, String expectedResult, String steps, LocalDateTime createdAt) {
         this.id = id;
         this.name = name;
         this.description = description;
         this.priority = priority;
         this.expectedResult = expectedResult;
+        this.steps = steps;
         this.createdAt = createdAt;
+    }
+
+    public TestCase(Long id, String name, String description, String priority, String expectedResult, LocalDateTime createdAt) {
+        this(id, name, description, priority, expectedResult, null, createdAt);
     }
 
     @PrePersist
@@ -93,6 +101,14 @@ public class TestCase {
 
     public void setExpectedResult(String expectedResult) {
         this.expectedResult = expectedResult;
+    }
+
+    public String getSteps() {
+        return steps;
+    }
+
+    public void setSteps(String steps) {
+        this.steps = steps;
     }
 
     public LocalDateTime getCreatedAt() {
