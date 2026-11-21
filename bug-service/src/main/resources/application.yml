@@ -34,3 +34,9 @@ management:
   endpoint:
     health:
       show-details: always
+
+llm:
+  api-key: ${LLM_API_KEY:}
+  model: ${LLM_MODEL:gemini-1.5-flash}
+  endpoint: ${LLM_ENDPOINT:}
+

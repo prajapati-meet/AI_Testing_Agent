@@ -14,3 +14,9 @@ spring:
 eureka:
   client:
     enabled: false
+
+llm:
+  api-key:
+  model: gemini-1.5-flash
+  endpoint:
+

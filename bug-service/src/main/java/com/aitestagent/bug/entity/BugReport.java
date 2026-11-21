@@ -12,6 +12,10 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
 
+/**
+ * Represents an AI-analyzed bug report associated with a failed test execution.
+ * Schema matches Table 4.3 of the specification.
+ */
 @Entity
 @Table(name = "bug_reports")
 public class BugReport {
@@ -23,23 +27,30 @@ public class BugReport {
     @Column(nullable = false)
     private Long executionId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 512)
     private String title;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 32)
     private BugSeverity severity;
 
-    @Column(length = 1000)
-    private String summary;
+    @Column(columnDefinition = "TEXT")
+    private String description;
 
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
+    private String stepsToReproduce;
+
+    @Column(columnDefinition = "TEXT")
     private String expectedResult;
 
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String actualResult;
 
+    @Column(columnDefinition = "TEXT")
     private String possibleArea;
+
+    @Column(length = 1024)
+    private String evidencePath;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -48,16 +59,19 @@ public class BugReport {
     }
 
     public BugReport(Long id, Long executionId, String title, BugSeverity severity,
-                     String summary, String expectedResult, String actualResult,
-                     String possibleArea, LocalDateTime createdAt) {
+                     String description, String stepsToReproduce, String expectedResult,
+                     String actualResult, String possibleArea, String evidencePath,
+                     LocalDateTime createdAt) {
         this.id = id;
         this.executionId = executionId;
         this.title = title;
         this.severity = severity;
-        this.summary = summary;
+        this.description = description;
+        this.stepsToReproduce = stepsToReproduce;
         this.expectedResult = expectedResult;
         this.actualResult = actualResult;
         this.possibleArea = possibleArea;
+        this.evidencePath = evidencePath;
         this.createdAt = createdAt;
     }
 
@@ -70,6 +84,8 @@ public class BugReport {
             this.severity = BugSeverity.MEDIUM;
         }
     }
+
+    // Getters and Setters
 
     public Long getId() {
         return id;
@@ -103,12 +119,20 @@ public class BugReport {
         this.severity = severity;
     }
 
-    public String getSummary() {
-        return summary;
+    public String getDescription() {
+        return description;
     }
 
-    public void setSummary(String summary) {
-        this.summary = summary;
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getStepsToReproduce() {
+        return stepsToReproduce;
+    }
+
+    public void setStepsToReproduce(String stepsToReproduce) {
+        this.stepsToReproduce = stepsToReproduce;
     }
 
     public String getExpectedResult() {
@@ -135,11 +159,28 @@ public class BugReport {
         this.possibleArea = possibleArea;
     }
 
+    public String getEvidencePath() {
+        return evidencePath;
+    }
+
+    public void setEvidencePath(String evidencePath) {
+        this.evidencePath = evidencePath;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    // Alias for legacy summary callers
+    public String getSummary() {
+        return description;
+    }
+
+    public void setSummary(String summary) {
+        this.description = summary;
     }
 }
