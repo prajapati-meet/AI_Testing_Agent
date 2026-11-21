@@ -11,3 +11,11 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
+
+playwright:
+  headless: true
+  screenshots-dir: screenshots
+
+services:
+  test-service:
+    url: http://TEST-SERVICE/api/tests

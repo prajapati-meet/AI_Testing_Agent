@@ -12,6 +12,12 @@ public record ExecutionResponse(
         LocalDateTime startedAt,
         LocalDateTime completedAt,
         String errorMessage,
-        String screenshotPath
+        String screenshotPath,
+        Integer failedStep
 ) {
+    public ExecutionResponse(Long id, Long testCaseId, String targetUrl, ExecutionStatus status,
+                             LocalDateTime startedAt, LocalDateTime completedAt,
+                             String errorMessage, String screenshotPath) {
+        this(id, testCaseId, targetUrl, status, startedAt, completedAt, errorMessage, screenshotPath, null);
+    }
 }
