@@ -1,14 +1,255 @@
 version: '3.8'
 
+# ==============================================================================
+# AI Test Agent — Complete Microservices Docker Compose Orchestration
+# Usage:
+#   docker compose up --build -d   (Starts all 10 services in background)
+#   docker compose logs -f         (Follow unified logs)
+#   docker compose down            (Stop all services)
+# ==============================================================================
+
+networks:
+  ai-test-agent-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  execution-screenshots:
+
 services:
+  # ----------------------------------------------------------------------------
+  # 1. PostgreSQL Database Instance (Houses 5 isolated databases per service)
+  # ----------------------------------------------------------------------------
   postgres:
     image: postgres:15-alpine
-    container_name: ai-test-agent-postgres
+    container_name: ai-postgres
+    networks:
+      - ai-test-agent-net
     ports:
-      - "5433:5432"
+      - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${DATABASE_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
     volumes:
-      - ./docs/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+      - ./docs/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 2. Service Registry (Netflix Eureka Server)
+  # ----------------------------------------------------------------------------
+  service-registry:
+    build:
+      context: ./service-registry
+      dockerfile: Dockerfile
+    container_name: ai-service-registry
+    networks:
+      - ai-test-agent-net
+    ports:
+      - "8761:8761"
+    environment:
+      SERVER_PORT: 8761
+      EUREKA_HOSTNAME: service-registry
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8761/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 3. API Gateway (Spring Cloud Gateway)
+  # ----------------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: ai-api-gateway
+    networks:
+      - ai-test-agent-net
+    ports:
+      - "8080:8080"
+    depends_on:
+      service-registry:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+      EUREKA_SERVER_URL: http://service-registry:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:-default_dev_jwt_secret_key_for_local_testing_only_32_bytes}
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 4. Authentication Service (JWT & User Identity)
+  # ----------------------------------------------------------------------------
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: ai-auth-service
+    networks:
+      - ai-test-agent-net
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8081
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      EUREKA_SERVER_URL: http://service-registry:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:-default_dev_jwt_secret_key_for_local_testing_only_32_bytes}
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 5. Exploration Service (Autonomous Playwright Web Crawler)
+  # ----------------------------------------------------------------------------
+  exploration-service:
+    build:
+      context: ./exploration-service
+      dockerfile: Dockerfile
+    container_name: ai-exploration-service
+    networks:
+      - ai-test-agent-net
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8082
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      EUREKA_SERVER_URL: http://service-registry:8761/eureka/
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 6. Test / AI Service (LLM Workflow Reasoning & Test Planning)
+  # ----------------------------------------------------------------------------
+  test-service:
+    build:
+      context: ./test-service
+      dockerfile: Dockerfile
+    container_name: ai-test-service
+    networks:
+      - ai-test-agent-net
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8083
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      EUREKA_SERVER_URL: http://service-registry:8761/eureka/
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 7. Execution Service (Playwright Deterministic Test Runner)
+  # ----------------------------------------------------------------------------
+  execution-service:
+    build:
+      context: ./execution-service
+      dockerfile: Dockerfile
+    container_name: ai-execution-service
+    networks:
+      - ai-test-agent-net
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8084
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      EUREKA_SERVER_URL: http://service-registry:8761/eureka/
+    volumes:
+      - execution-screenshots:/app/screenshots
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 8. Bug Analysis Service (LLM Failure Analysis & Bug Reporting)
+  # ----------------------------------------------------------------------------
+  bug-service:
+    build:
+      context: ./bug-service
+      dockerfile: Dockerfile
+    container_name: ai-bug-service
+    networks:
+      - ai-test-agent-net
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8085
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      EUREKA_SERVER_URL: http://service-registry:8761/eureka/
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 9. Demo Target Web App (React E-Commerce with BUG_MODE Toggle)
+  # ----------------------------------------------------------------------------
+  demo-target-app:
+    build:
+      context: ./demo-target-app
+      dockerfile: Dockerfile
+    container_name: ai-demo-target-app
+    networks:
+      - ai-test-agent-net
+    ports:
+      - "3000:80"
+    environment:
+      BUG_MODE: ${BUG_MODE:-false}
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # 10. React Frontend Dashboard
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ai-frontend-dashboard
+    networks:
+      - ai-test-agent-net
+    ports:
+      - "5173:80"
+    depends_on:
+      - api-gateway
     restart: unless-stopped

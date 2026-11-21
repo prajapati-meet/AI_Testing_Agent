@@ -1,0 +1,790 @@
+%% ============================================================================
+%% Chapter 2 — Literature Survey
+%% AI Test Agent: Autonomous AI-Based Web Application Testing
+%%                and Intelligent Bug Reporting
+%% ============================================================================
+
+\chapter{Literature Survey}
+\label{chap:litsurvey}
+
+This chapter presents a comprehensive review of the literature that underpins the
+design and development of the AI Test Agent platform. The survey spans classical
+software testing theory, modern automated testing frameworks, the emergence of
+artificial intelligence and large language models (LLMs) in software engineering,
+agentic AI paradigms, browser automation technologies, intelligent bug detection
+research, and microservices-based software architecture. A comparative analysis
+of existing tools and approaches is provided, culminating in an identification of
+the research gap that the AI Test Agent addresses.
+
+%%=============================================================================
+\section{Introduction to Software Testing Research}
+\label{sec:testing_research_intro}
+%%=============================================================================
+
+Software testing is a systematic process of evaluating a software system to
+detect differences between existing and required conditions and to assess the
+features of the software~\cite{myers2011art}. It is universally acknowledged as
+one of the most critical activities in the software development life cycle
+(SDLC), consuming an estimated 30--50\% of total project effort in
+industrial practice~\cite{aniche2022testing}. The International Software
+Testing Qualifications Board (ISTQB) defines testing as the process consisting
+of all life cycle activities, both static and dynamic, concerned with planning,
+preparation, and evaluation of a component or system and related work products
+to determine that they satisfy specified requirements~\cite{istqb2023}.
+
+Historically, software testing research has evolved through several distinct
+phases. Early work in the 1970s and 1980s established the theoretical
+foundations of test adequacy criteria, including statement coverage, branch
+coverage, and path coverage~\cite{myers2011art}. The 1990s and 2000s saw the
+maturation of automated test execution frameworks and the formalization of
+model-based testing. The 2010s brought data-driven approaches, with machine
+learning being applied to test case prioritization, fault prediction, and
+automated test generation. Most recently, the 2020s have witnessed a
+paradigm shift with the introduction of large language models capable of
+understanding and generating both natural language and source
+code~\cite{openai2023gpt4, chen2021codex}.
+
+The AI Test Agent project is situated at this modern intersection of software
+testing, agentic AI systems, and LLM-driven reasoning. It draws upon decades
+of testing theory while leveraging the latest advances in AI to create an
+autonomous testing platform that observes, reasons about, plans, and executes
+functional tests on web applications without manual test script authoring.
+
+%%=============================================================================
+\section{Traditional Software Testing Techniques}
+\label{sec:traditional_testing}
+%%=============================================================================
+
+Traditional software testing techniques form the bedrock upon which all
+subsequent automation and AI-driven approaches are built. These techniques
+are broadly categorized by the degree of internal knowledge available to
+the tester.
+
+\subsection{Black-Box Testing}
+\label{subsec:black_box}
+
+Black-box testing, also called specification-based testing, treats the system
+under test as an opaque entity and derives test cases entirely from the
+external specification~\cite{myers2011art}. The tester has no knowledge of or
+access to the internal code structure. Key black-box techniques include:
+
+\begin{itemize}[nosep]
+  \item \textbf{Equivalence Partitioning:} The input domain is divided into
+        classes of data from which test cases are derived, under the
+        assumption that all members of a partition are processed equivalently.
+  \item \textbf{Boundary Value Analysis:} Test cases are designed at the
+        edges of equivalence partitions, as experience shows that errors
+        tend to cluster at boundaries.
+  \item \textbf{Decision Table Testing:} Combinatorial logic involving
+        multiple conditions and their corresponding actions is captured
+        in a decision table, from which test cases are systematically derived.
+  \item \textbf{State Transition Testing:} The system is modeled as a finite
+        state machine, and tests exercise transitions between states triggered
+        by events and guarded by conditions.
+\end{itemize}
+
+The AI Test Agent employs a form of black-box testing in its core workflow:
+the exploration service crawls the target application's user interface to
+discover navigable elements, forms, buttons, and links. The LLM-based test
+planner then generates functional test cases based solely on the observed
+UI structure and inferred application semantics, without access to the
+target application's source code.
+
+\subsection{White-Box Testing}
+\label{subsec:white_box}
+
+White-box testing, or structural testing, leverages full knowledge of the
+internal implementation to design test cases that exercise specific code
+paths~\cite{myers2011art}. Techniques include statement coverage, branch
+coverage, condition coverage, and path coverage. While white-box testing
+achieves thorough code-level verification, it requires access to source
+code and deep understanding of the implementation, making it impractical
+for external or third-party application testing scenarios.
+
+\subsection{Gray-Box Testing}
+\label{subsec:gray_box}
+
+Gray-box testing combines elements of both black-box and white-box
+approaches. The tester possesses partial knowledge of the internal
+structure---such as data flow, architectural patterns, or API
+contracts---while designing tests that are executed from the external
+interface. The AI Test Agent can be considered a gray-box approach in
+the sense that the exploration service extracts structural information
+(DOM elements, form structures, navigation patterns) from the
+target application, providing the AI planner with partial internal
+knowledge beyond what a pure black-box tester would possess.
+
+\subsection{Regression Testing}
+\label{subsec:regression}
+
+Regression testing ensures that previously working functionality continues
+to operate correctly after code changes, bug fixes, or feature
+additions~\cite{istqb2023}. It is one of the most resource-intensive
+testing activities, as the regression suite tends to grow monotonically
+over the life of a project. Test case prioritization and selection
+techniques have been extensively studied to manage regression testing
+costs~\cite{aniche2022testing}. The AI Test Agent contributes to this
+domain by enabling rapid regeneration of test suites for target
+applications---since tests are generated autonomously from the current
+UI state, the system naturally adapts to interface changes without
+manual test maintenance.
+
+%%=============================================================================
+\section{Automated Functional Testing}
+\label{sec:automated_testing}
+%%=============================================================================
+
+Automated functional testing involves the use of specialized software
+tools to control the execution of tests and the comparison of actual
+outcomes with predicted outcomes. This section reviews the major
+frameworks and paradigms in web application test automation.
+
+\subsection{Selenium}
+\label{subsec:selenium}
+
+Selenium is the most widely adopted open-source web testing
+framework~\cite{selenium2004}. It provides the WebDriver API, which
+enables programmatic control of web browsers (Chrome, Firefox, Edge,
+Safari) through language bindings in Java, Python, C\#, JavaScript,
+and Ruby. Selenium's architecture is based on a client--server model
+where the WebDriver client sends commands to a browser-specific driver
+binary, which translates them into browser-native automation protocols.
+
+While Selenium revolutionized web testing, it has well-documented
+limitations: flaky tests due to implicit timing dependencies, lack of
+built-in auto-waiting mechanisms, difficulty handling modern single-page
+application (SPA) frameworks, limited support for intercepting network
+requests, and the overhead of managing separate driver binaries for each
+browser version.
+
+\subsection{Cypress}
+\label{subsec:cypress}
+
+Cypress emerged as a developer-centric alternative to Selenium,
+executing tests directly within the browser's JavaScript runtime rather
+than over a remote protocol. This in-process architecture provides
+deterministic execution, automatic waiting, time-travel debugging, and
+real-time reloading. However, Cypress is limited to Chromium-based
+browsers and Firefox, does not support multi-tab or multi-domain testing
+in a single test, and is restricted to the JavaScript/TypeScript
+ecosystem.
+
+\subsection{Playwright}
+\label{subsec:playwright_overview}
+
+Microsoft Playwright represents the latest generation of browser
+automation libraries~\cite{playwright2024}. It supports Chromium,
+Firefox, and WebKit from a single API, provides built-in auto-waiting,
+network interception, and multiple browser context isolation. Playwright
+is available in JavaScript/TypeScript, Python, Java, and .NET. Its
+architecture communicates with browsers over the Chrome DevTools Protocol
+(CDP) and equivalent protocols for Firefox and WebKit, enabling
+fine-grained control over browser behavior. The AI Test Agent uses
+Playwright for Java as its deterministic browser actuator, as discussed
+further in Section~\ref{sec:playwright_detail}.
+
+\subsection{Record-and-Playback vs.\ Script-Based Approaches}
+\label{subsec:record_playback}
+
+Record-and-playback tools (e.g., Selenium IDE, Playwright Codegen)
+capture user interactions and replay them as automated tests. While
+accessible to non-programmers, these tools produce brittle, hard-to-maintain
+scripts that break with minor UI changes. Script-based approaches, where
+engineers manually author test code using framework APIs, offer greater
+flexibility and maintainability but require significant programming
+expertise and time investment. The AI Test Agent transcends both paradigms:
+it autonomously generates test plans from observed UI structure using LLM
+reasoning, then executes them through Playwright's programmatic API---combining
+the accessibility of record-and-playback with the robustness of
+script-based execution.
+
+%%=============================================================================
+\section{Artificial Intelligence in Software Testing}
+\label{sec:ai_testing}
+%%=============================================================================
+
+The application of artificial intelligence techniques to software testing
+has been an active research area for over two decades, with significant
+acceleration in recent years.
+
+\subsection{Machine Learning for Test Case Generation}
+\label{subsec:ml_test_gen}
+
+Machine learning (ML) models have been applied to generate test cases
+from various software artifacts. Supervised learning approaches train
+models on historical test data to predict effective test inputs.
+Reinforcement learning agents have been used to explore application
+state spaces, learning optimal sequences of UI interactions that
+maximize code coverage or fault detection~\cite{aniche2022testing}.
+Search-based software testing (SBST) employs evolutionary algorithms
+(genetic algorithms, particle swarm optimization) to evolve test suites
+that optimize coverage criteria. Tools such as EvoSuite for Java unit
+testing exemplify this approach, generating JUnit test suites that
+achieve high branch coverage through guided search.
+
+\subsection{Test Case Prioritization}
+\label{subsec:test_prioritization}
+
+Test case prioritization reorders test suites to maximize the rate of
+fault detection, enabling earlier discovery of defects in time-constrained
+testing environments~\cite{istqb2023}. ML-based prioritization
+techniques use features such as code change history, test execution
+history, code complexity metrics, and requirement traceability to predict
+which tests are most likely to reveal faults. Deep learning models,
+including recurrent neural networks, have been applied to learn temporal
+patterns in test failure histories for improved prioritization accuracy.
+
+\subsection{Fault Localization}
+\label{subsec:fault_localization}
+
+Fault localization identifies the most probable locations of defects in
+source code, given a set of failing and passing test cases.
+Spectrum-based fault localization (SBFL) techniques, such as Tarantula,
+Ochiai, and DStar, rank program statements by suspiciousness scores
+computed from test execution spectra. ML-enhanced fault localization
+models incorporate additional features---such as code complexity,
+developer change patterns, and code churn---to improve localization
+accuracy. The AI Test Agent's bug analysis service applies a
+complementary approach: rather than analyzing source code spectra, it
+uses LLM-based reasoning over execution traces, failure screenshots, and
+assertion results to generate root-cause hypotheses in natural language.
+
+\subsection{Mutation Testing}
+\label{subsec:mutation_testing}
+
+Mutation testing evaluates test suite quality by introducing small
+syntactic changes (mutants) into the source code and measuring the
+proportion of mutants detected (killed) by the test
+suite~\cite{aniche2022testing}. While computationally expensive, mutation
+testing provides a rigorous measure of test effectiveness. AI techniques
+have been applied to reduce mutation testing costs through equivalent
+mutant detection and selective mutation strategies.
+
+%%=============================================================================
+\section{Large Language Models in Software Engineering}
+\label{sec:llm_se}
+%%=============================================================================
+
+The emergence of large language models (LLMs) has fundamentally
+transformed multiple aspects of software engineering, from code
+generation to testing to documentation.
+
+\subsection{Transformer Architecture and the GPT Family}
+\label{subsec:transformers}
+
+The transformer architecture, introduced by Vaswani et
+al.~\cite{vaswani2017attention}, replaced recurrent neural networks
+with self-attention mechanisms that process input sequences in parallel.
+This architecture enabled the training of models on vastly larger
+datasets, leading to emergent capabilities in language understanding
+and generation. The Generative Pre-trained Transformer (GPT) family
+of models, culminating in GPT-4~\cite{openai2023gpt4}, demonstrated
+state-of-the-art performance across a wide range of natural language
+processing and code-related tasks. GPT-4 is a multimodal model capable
+of accepting both text and image inputs, producing text outputs with
+human-level performance on numerous professional and academic
+benchmarks.
+
+\subsection{Code Generation with LLMs}
+\label{subsec:code_gen}
+
+OpenAI Codex, a GPT model fine-tuned on publicly available code
+repositories, demonstrated that LLMs can generate functionally correct
+code from natural language descriptions~\cite{chen2021codex}. Chen et
+al.\ evaluated Codex on the HumanEval benchmark, a set of 164 Python
+programming problems, achieving 28.8\% pass@1 accuracy with the initial
+model, rising to 72.3\% with 100 samples (pass@100). Subsequent models
+(GPT-3.5-turbo, GPT-4) substantially improved these numbers. The
+capability to generate code from natural language is foundational to
+the AI Test Agent's approach: the LLM receives structured descriptions
+of discovered web pages and generates executable test plans expressed
+as sequences of browser actions.
+
+\subsection{Test Generation with LLMs}
+\label{subsec:llm_test_gen}
+
+Recent research has explored the use of LLMs for automated test
+generation~\cite{king2024llmtest}. Studies demonstrate that LLMs can
+generate unit tests, integration tests, and end-to-end tests from
+source code, documentation, or UI descriptions. Key findings include:
+
+\begin{itemize}[nosep]
+  \item LLMs generate tests with reasonable code coverage, though they
+        may produce tests with incorrect assertions (hallucinated oracles).
+  \item Prompt engineering---including few-shot examples, chain-of-thought
+        reasoning, and structured output formatting---significantly
+        improves test quality.
+  \item LLM-generated tests are most effective when combined with
+        deterministic execution and validation, as the AI Test Agent
+        does by separating LLM-based planning from Playwright-based
+        execution.
+\end{itemize}
+
+The AI Test Agent builds on this research direction by using LLMs not
+merely to generate isolated test functions but to reason about
+end-to-end user workflows across multiple pages, producing structured
+JSON test plans that are validated and executed deterministically.
+
+%%=============================================================================
+\section{Agentic AI Systems}
+\label{sec:agentic_ai}
+%%=============================================================================
+
+Agentic AI refers to systems where an AI model operates as an
+autonomous agent that perceives its environment, reasons about
+observations, plans actions, and executes those actions in a feedback
+loop~\cite{yang2023agentic, wang2024survey}. This paradigm extends
+beyond single-query LLM usage into multi-step, goal-directed behavior.
+
+\subsection{Autonomous Agents and Cognitive Architectures}
+\label{subsec:autonomous_agents}
+
+Wang et al.~\cite{wang2024survey} present a comprehensive survey on
+LLM-based autonomous agents, identifying four key modules: profiling,
+memory, planning, and action. The profiling module defines the agent's
+role and expertise. The memory module maintains short-term (context
+window) and long-term (external storage) information. The planning
+module decomposes complex tasks into sub-goals through strategies such
+as chain-of-thought reasoning, task decomposition, and self-reflection.
+The action module translates plans into concrete operations in the
+external environment.
+
+\subsection{Observe--Reason--Act Loops}
+\label{subsec:ora_loop}
+
+The observe--reason--act (ORA) loop is the fundamental execution cycle
+of an agentic AI system. At each iteration, the agent:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Observes:} Perceives the current state of the
+        environment through sensors, APIs, or tool outputs.
+  \item \textbf{Reasons:} Applies internal models (LLM inference,
+        retrieval-augmented generation, chain-of-thought) to interpret
+        observations and decide on the next course of action.
+  \item \textbf{Acts:} Executes the selected action using available
+        tools, APIs, or actuators, thereby modifying the environment.
+\end{enumerate}
+
+The AI Test Agent implements a structured variant of this loop:
+\texttt{OBSERVE} $\rightarrow$ \texttt{REASON} $\rightarrow$
+\texttt{PLAN} $\rightarrow$ \texttt{ACT} $\rightarrow$
+\texttt{OBSERVE~RESULT} $\rightarrow$ \texttt{ANALYZE}. The
+exploration service observes the target application's UI structure.
+The test/AI service reasons about what workflows and edge cases
+merit testing and plans structured test cases. The execution service
+acts by running these test cases through Playwright. The bug analysis
+service observes the execution results and analyzes failures to
+produce actionable bug reports.
+
+\subsection{Tool-Using Agents}
+\label{subsec:tool_agents}
+
+A defining characteristic of modern agentic AI systems is their
+ability to use external tools~\cite{wang2024survey}. Rather than
+relying solely on the knowledge embedded in the LLM's parameters,
+tool-using agents invoke APIs, execute code, query databases, browse
+the web, and control external applications. In the AI Test Agent, the
+LLM functions as the ``brain'' that generates plans and analyses,
+while Playwright serves as the deterministic ``actuator'' that
+executes browser operations. This strict separation---where the LLM
+never directly executes arbitrary browser code---ensures
+reproducibility, safety, and auditability of the testing process.
+
+%%=============================================================================
+\section{Browser Automation and Playwright}
+\label{sec:playwright_detail}
+%%=============================================================================
+
+Browser automation is the technological foundation that enables
+automated functional testing of web applications. This section provides
+a detailed comparison of major browser automation technologies and
+justifies the selection of Playwright for the AI Test Agent.
+
+\subsection{Evolution of Browser Automation}
+\label{subsec:browser_evolution}
+
+Browser automation has evolved through several generations:
+
+\begin{enumerate}[nosep]
+  \item \textbf{First Generation (2004--2011):} Selenium RC, which
+        injected JavaScript into the browser to simulate user actions.
+        Limited by same-origin policy restrictions and timing
+        instabilities.
+  \item \textbf{Second Generation (2011--2018):} Selenium WebDriver,
+        which introduced a standardized browser driver protocol (later
+        formalized as the W3C WebDriver specification). The
+        client--driver--browser architecture became the industry
+        standard~\cite{selenium2004}.
+  \item \textbf{Third Generation (2018--present):} CDP-based tools
+        (Puppeteer, Playwright) that communicate directly with browser
+        internals over the Chrome DevTools Protocol, enabling
+        capabilities such as network interception, geolocation emulation,
+        and device emulation~\cite{playwright2024}.
+\end{enumerate}
+
+\subsection{Comparison of Selenium, Cypress, and Playwright}
+\label{subsec:framework_comparison}
+
+Table~\ref{tab:browser_comparison} provides a feature-level comparison
+of the three major browser automation frameworks.
+
+\begin{table}[H]
+\centering
+\caption{Comparison of Browser Automation Frameworks}
+\label{tab:browser_comparison}
+\small
+\begin{tabularx}{\textwidth}{@{} l X X X @{}}
+\toprule
+\textbf{Feature} & \textbf{Selenium} & \textbf{Cypress} & \textbf{Playwright} \\
+\midrule
+Multi-browser support & Chrome, Firefox, Edge, Safari & Chromium, Firefox (limited) & Chromium, Firefox, WebKit \\
+Language bindings & Java, Python, C\#, JS, Ruby & JavaScript/TypeScript only & Java, Python, .NET, JS/TS \\
+Auto-waiting & Manual (explicit/implicit waits) & Built-in & Built-in \\
+Network interception & Via proxy (BrowserMob) & Built-in & Built-in \\
+Multi-tab/multi-context & Limited & Not supported & Full support \\
+Parallel execution & Via Selenium Grid & Limited & Native support \\
+Mobile emulation & Via Appium (separate) & Limited & Built-in device emulation \\
+iFrame handling & Supported (verbose) & Supported (limited) & Seamless \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Advantages of Playwright for AI Test Agent}
+\label{subsec:playwright_advantages}
+
+Playwright was selected as the browser automation engine for the AI
+Test Agent for several technical reasons~\cite{playwright2024}:
+
+\begin{itemize}[nosep]
+  \item \textbf{Java Integration:} Playwright for Java integrates
+        seamlessly with the Spring Boot microservices architecture,
+        allowing browser automation to be embedded directly within the
+        exploration and execution services.
+  \item \textbf{Deterministic Auto-Waiting:} Playwright automatically
+        waits for elements to be actionable (visible, stable, enabled)
+        before performing operations, drastically reducing test
+        flakiness compared to Selenium.
+  \item \textbf{Browser Context Isolation:} Each test execution runs
+        in an isolated browser context with independent cookies, storage,
+        and cache, enabling parallel, interference-free test execution.
+  \item \textbf{Network Interception:} Built-in route interception
+        allows the system to monitor, mock, or modify network requests
+        during test execution, which is valuable for testing error
+        handling scenarios.
+  \item \textbf{Screenshot and Trace Capture:} Native support for
+        full-page screenshots and execution traces provides rich
+        diagnostic data for the LLM-based bug analysis service.
+\end{itemize}
+
+%%=============================================================================
+\section{Intelligent Bug Detection and Reporting}
+\label{sec:intelligent_bug_detection}
+%%=============================================================================
+
+The automation of bug detection and reporting has been a long-standing
+goal of software engineering research. Traditional approaches rely on
+static analysis tools, dynamic analysis instruments, and manual
+developer triage. Recent advances leverage AI to automate not only the
+detection of failures but also the generation of structured,
+human-readable bug reports.
+
+\subsection{Automated Bug Reporting Research}
+\label{subsec:automated_bug_reports}
+
+Automated bug reporting systems aim to produce defect reports that
+contain sufficient information for developers to understand, reproduce,
+and fix the reported issue. Research has identified several essential
+components of effective bug reports: a descriptive summary, steps to
+reproduce, expected versus actual behavior, environmental context
+(browser, OS, version), severity classification, and supporting
+evidence (screenshots, logs, stack traces)~\cite{aniche2022testing}.
+
+Traditional automated bug reporters extract information from crash
+logs, exception traces, and execution recordings. However, they
+typically lack the ability to interpret failure context semantically---that
+is, to explain \emph{why} a failure occurred in terms of application
+logic rather than merely recording \emph{what} happened at the
+technical level.
+
+\subsection{Root Cause Analysis with AI}
+\label{subsec:root_cause_ai}
+
+AI-driven root cause analysis (RCA) applies machine learning and,
+more recently, LLM reasoning to identify the underlying cause of
+observed failures. LLMs are particularly well-suited to this task
+because they can process heterogeneous inputs---assertion failure
+messages, HTML snapshots, screenshots, execution logs---and synthesize
+a coherent natural-language explanation of the probable root
+cause~\cite{openai2023gpt4}.
+
+The AI Test Agent's bug analysis service implements LLM-based RCA
+through the following pipeline:
+
+\begin{enumerate}[nosep]
+  \item Failed test execution results (including step-by-step outcomes,
+        assertion messages, and screenshots) are collected by the
+        execution service.
+  \item These artifacts are forwarded to the bug analysis service, which
+        invokes a LangGraph-orchestrated LLM workflow.
+  \item The LLM analyzes the failure evidence, generates a structured
+        bug report with severity classification (Critical, Major, Minor,
+        Trivial) and a natural-language root-cause hypothesis, and
+        returns the report for dashboard display.
+\end{enumerate}
+
+%%=============================================================================
+\section{Microservices-Based Software Architecture}
+\label{sec:microservices}
+%%=============================================================================
+
+The AI Test Agent is architected as a microservices-based system, a
+design choice informed by extensive literature on modern distributed
+software architecture.
+
+\subsection{Microservices: Definition and Principles}
+\label{subsec:microservices_def}
+
+Fowler and Lewis define microservices as an architectural style that
+structures an application as a collection of small, autonomous services,
+each running in its own process, communicating over lightweight
+mechanisms (typically HTTP REST APIs), and independently
+deployable~\cite{fowler2014microservices}. Newman elaborates on the
+organizational and technical principles: services are built around
+business capabilities, own their data, can be deployed independently,
+and embrace decentralized governance~\cite{newman2021microservices}.
+
+\subsection{Key Microservices Patterns}
+\label{subsec:microservices_patterns}
+
+The AI Test Agent employs several established microservices patterns:
+
+\begin{itemize}[nosep]
+  \item \textbf{API Gateway Pattern:} A single entry point (Spring Cloud
+        Gateway on port 8080) routes client requests to the appropriate
+        backend service, handles cross-cutting concerns such as CORS
+        configuration and JWT validation, and decouples the frontend
+        from individual service endpoints~\cite{newman2021microservices}.
+  \item \textbf{Service Registry and Discovery:} Netflix Eureka Server
+        provides dynamic service registration and discovery. Each
+        microservice registers itself with Eureka on startup, and the
+        API Gateway uses load-balanced URIs (\texttt{lb://SERVICE-NAME})
+        to route requests without hardcoded hostnames or
+        ports~\cite{fowler2014microservices}.
+  \item \textbf{Database-per-Service:} Each microservice owns a dedicated
+        PostgreSQL database (\texttt{auth\_db}, \texttt{exploration\_db},
+        \texttt{test\_db}, \texttt{execution\_db}, \texttt{bug\_db}).
+        No service directly accesses another service's database; all
+        inter-service communication occurs via REST
+        APIs~\cite{newman2021microservices}.
+  \item \textbf{Externalized Configuration:} Service configuration
+        (database URLs, API keys, port assignments) is managed through
+        environment variables and Spring Boot application properties,
+        enabling deployment flexibility across development, testing,
+        and production environments.
+\end{itemize}
+
+\subsection{Benefits of Microservices for the AI Test Agent}
+\label{subsec:microservices_benefits}
+
+The microservices architecture provides several specific advantages for
+the AI Test Agent:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Independent Scalability:} The execution service, which
+        manages resource-intensive browser instances, can be scaled
+        independently of the lightweight auth service.
+  \item \textbf{Technology Heterogeneity:} While the backend services
+        use Java/Spring Boot, the AI/agent layer can leverage Python-based
+        frameworks (LangGraph, LangChain) where the ML ecosystem is
+        richest.
+  \item \textbf{Fault Isolation:} A failure in one service (e.g., the
+        bug analysis service encountering an LLM API error) does not
+        cascade to other services; the exploration and execution services
+        continue to operate normally.
+  \item \textbf{Team Autonomy:} The two-developer team was able to work
+        on different services concurrently using feature branches, with
+        well-defined REST API contracts as integration boundaries.
+\end{enumerate}
+
+%%=============================================================================
+\section{Comparative Analysis of Existing Tools and Approaches}
+\label{sec:comparative_analysis}
+%%=============================================================================
+
+Table~\ref{tab:comparative_analysis} presents a comparative analysis of
+existing testing tools and approaches alongside the AI Test Agent,
+evaluating them across key dimensions including autonomy, AI integration,
+browser support, test generation methodology, bug reporting capability,
+and architectural paradigm.
+
+\begin{table}[H]
+\centering
+\caption{Comparative Analysis of Testing Approaches and Tools}
+\label{tab:comparative_analysis}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{} >{\raggedright\arraybackslash}p{2.1cm}
+                                  >{\raggedright\arraybackslash}X
+                                  >{\raggedright\arraybackslash}X
+                                  >{\raggedright\arraybackslash}X
+                                  >{\raggedright\arraybackslash}X
+                                  >{\raggedright\arraybackslash}X
+                                  >{\raggedright\arraybackslash}X @{}}
+\toprule
+\textbf{Criterion} &
+\textbf{Selenium WebDriver} &
+\textbf{Cypress} &
+\textbf{Playwright} &
+\textbf{SBST / EvoSuite} &
+\textbf{LLM-Based Test Gen.} &
+\textbf{AI Test Agent} \\
+\midrule
+
+Test Generation &
+Manual script writing &
+Manual script writing &
+Manual or codegen &
+Automated (search-based) &
+Automated (LLM prompt) &
+Fully autonomous (agentic LLM) \\
+
+Target Scope &
+Web UI &
+Web UI &
+Web UI &
+Java unit tests &
+Unit/API tests &
+Web UI (end-to-end) \\
+
+AI Integration &
+None &
+None &
+None &
+Evolutionary algorithms &
+LLM for generation &
+LLM for planning, analysis \& bug reporting \\
+
+Browser Support &
+Chrome, Firefox, Edge, Safari &
+Chromium, Firefox &
+Chromium, Firefox, WebKit &
+N/A &
+Varies &
+Chromium, Firefox, WebKit (via Playwright) \\
+
+Bug Reporting &
+Manual by tester &
+Manual by tester &
+Trace viewer (manual) &
+Not applicable &
+Not integrated &
+Automated LLM-generated reports \\
+
+Architecture &
+Monolithic client &
+Monolithic runner &
+Library/CLI &
+CLI tool &
+Script/notebook &
+Microservices (6 services + gateway) \\
+
+Autonomy Level &
+None (fully manual) &
+None (fully manual) &
+Low (codegen assist) &
+Medium (automated gen.) &
+Medium (requires prompts) &
+High (observe--reason--act loop) \\
+
+Maintenance &
+High (brittle selectors) &
+Medium &
+Low (auto-wait) &
+Low (re-generate) &
+Low (re-prompt) &
+Minimal (re-explore \& regenerate) \\
+
+\bottomrule
+\end{tabularx}
+\end{table}
+
+As illustrated in Table~\ref{tab:comparative_analysis}, existing tools
+occupy specific points in the automation spectrum. Selenium, Cypress,
+and Playwright provide powerful browser automation capabilities but
+require manual test authoring. Search-based approaches like EvoSuite
+automate test generation but are limited to unit-level testing of Java
+applications. LLM-based test generation research demonstrates promising
+results but typically operates in isolated, single-shot prompting
+scenarios without integrated execution or bug reporting. The AI Test
+Agent uniquely combines autonomous exploration, agentic LLM-driven
+test planning, deterministic Playwright execution, and intelligent
+bug analysis within a cohesive microservices architecture.
+
+%%=============================================================================
+\section{Research Gap}
+\label{sec:research_gap}
+%%=============================================================================
+
+The literature review reveals several significant gaps in existing
+software testing tools and research that the AI Test Agent addresses:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Fragmented Workflows:} Existing approaches treat test
+        generation, test execution, and bug reporting as disconnected
+        activities. A tester must separately write tests (or prompt an
+        LLM), configure and run a test framework, manually analyze
+        failures, and compose bug reports. The AI Test Agent integrates
+        all four activities into a single, cohesive, end-to-end pipeline.
+
+  \item \textbf{Lack of Autonomous Exploration:} Traditional test
+        automation frameworks require testers to know, a priori, the
+        structure of the application under test and the specific
+        scenarios to verify. No mainstream tool autonomously explores
+        a target application's UI to discover testable workflows. The
+        AI Test Agent's exploration service fills this gap by crawling
+        the target application and building structured page models that
+        feed directly into AI-driven test planning.
+
+  \item \textbf{No Closed-Loop Agentic Testing:} While agentic AI
+        research has demonstrated observe--reason--act loops for
+        general-purpose tasks~\cite{wang2024survey, yang2023agentic},
+        the application of this paradigm specifically to functional
+        web application testing---with deterministic execution
+        guarantees and structured bug output---is not addressed by
+        existing tools or research prototypes.
+
+  \item \textbf{LLM Hallucination in Test Oracles:} LLM-generated
+        tests are prone to hallucinated assertions---test oracles that
+        do not correspond to actual application behavior. The AI Test
+        Agent mitigates this by separating LLM planning (which produces
+        structured action sequences) from deterministic Playwright
+        execution (which performs actual assertions against the live
+        application state), ensuring that test verdicts are grounded
+        in real browser observations.
+
+  \item \textbf{Manual Bug Triage:} Even in highly automated testing
+        environments, failure analysis and bug report authoring remain
+        manual, time-consuming activities. Existing tools generate raw
+        logs and screenshots but do not interpret failures or suggest
+        root causes. The AI Test Agent's LLM-powered bug analysis
+        service generates structured, severity-classified bug reports
+        with root-cause hypotheses, significantly reducing the manual
+        effort required for defect triage.
+
+  \item \textbf{Monolithic Tool Architecture:} Most testing tools are
+        monolithic applications or CLI-based utilities that cannot be
+        independently scaled, extended, or deployed. The AI Test Agent's
+        microservices architecture enables independent scaling of
+        resource-intensive components (browser execution, LLM inference),
+        fault isolation, and technology heterogeneity---addressing
+        the operational limitations of monolithic testing
+        tools~\cite{fowler2014microservices, newman2021microservices}.
+\end{enumerate}
+
+\noindent
+In summary, the AI Test Agent addresses a confluence of gaps at the
+intersection of browser automation, agentic AI, LLM-driven reasoning,
+and microservices architecture. By unifying autonomous exploration,
+intelligent test planning, deterministic execution, and AI-powered bug
+analysis into a single platform, it advances the state of practice
+beyond what any individual existing tool or research approach provides.

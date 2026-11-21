@@ -182,11 +182,46 @@ Structured Bug Report
 
 ## 7. How to Run the Project
 
-### Prerequisites
+### Option A: Complete Docker Compose (Recommended for Team Collaboration)
+
+Run all 10 services (Postgres, Eureka, Gateway, 5 Microservices, Frontend Dashboard, Demo Target App) with a single command:
+
+1. **Copy the environment configuration:**
+   ```bash
+   cp .env.example .env
+   ```
+2. **Start all services in detached mode:**
+   ```bash
+   docker compose up --build -d
+   ```
+3. **Check container health and logs:**
+   ```bash
+   docker compose ps
+   docker compose logs -f
+   ```
+4. **Access Applications in your browser:**
+   - **Frontend Dashboard:** `http://localhost:5173`
+   - **Demo Target E-Commerce App:** `http://localhost:3000`
+   - **API Gateway Entry Point:** `http://localhost:8080`
+   - **Eureka Service Registry:** `http://localhost:8761`
+5. **Stop all services:**
+   ```bash
+   docker compose down
+   ```
+
+*(Playwright browser engines for `exploration-service` and `execution-service` run automatically inside official Microsoft Jammy containers with zero local browser setup.)*
+
+---
+
+### Option B: Local Development / Hybrid Startup (Manual IDE Run)
+
+Use this mode when you want to develop or debug an individual microservice locally without rebuilding Docker containers.
+
+#### Prerequisites
 - **Java 21** (`java -version`)
 - **Apache Maven 3.9+** (`mvn -version`)
 - **Node.js 18+ & npm** (`node -v`, `npm -v`)
-- **PostgreSQL 15+** running on `localhost:5432`
+- **PostgreSQL 15+** on `localhost:5432` (or use Docker for Postgres: `docker compose up -d postgres`)
 
 ### Step 1: Prepare Environment & PostgreSQL Databases
 1. Copy `.env.example` to `.env` and fill in your local credentials:
