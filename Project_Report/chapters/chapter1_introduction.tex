@@ -1,0 +1,293 @@
+% ============================================================
+% Chapter 1: Introduction
+% AI Test Agent — Minor Project Report, PDEU
+% Author: Meet Prajapati (23BCP265)
+% ============================================================
+
+\chapter{Introduction}
+\label{chap:intro}
+
+The rapid proliferation of web-based applications across virtually every sector of industry and governance has fundamentally altered the landscape of software engineering. As organizations increasingly rely on complex, feature-rich web platforms to deliver services, process transactions, and engage with users, the imperative to ensure the correctness, reliability, and security of these systems has never been more critical. Software testing, long regarded as an indispensable phase of the Software Development Life Cycle (SDLC), has struggled to keep pace with the velocity of modern agile and DevOps-driven development workflows. Traditional manual testing methodologies, while thorough in their intent, suffer from inherent limitations in speed, scalability, and consistency that render them inadequate for the demands of contemporary software delivery pipelines.
+
+This chapter introduces the \textbf{AI Test Agent}, an autonomous, artificial-intelligence-driven web application testing and intelligent bug reporting platform built upon a microservices architecture. The system leverages Large Language Models (LLMs) for cognitive reasoning about application behaviour, the Playwright browser automation framework for reliable cross-browser interaction, and a distributed service-oriented backend to deliver end-to-end automated testing without the need for manually authored test scripts. The following sections establish the background, motivation, problem statement, objectives, and scope of this project, and conclude with an overview of the system architecture and the organization of the remainder of this report.
+
+
+% ============================================================
+\section{Background}
+\label{sec:background}
+
+The World Wide Web has evolved from a medium for static document retrieval into a sophisticated application delivery platform. Modern web applications---ranging from enterprise resource planning systems and e-commerce marketplaces to healthcare portals and financial trading dashboards---are characterised by dynamic content rendering, complex client-side logic executed within JavaScript frameworks, asynchronous server communication via RESTful and GraphQL APIs, and rich user interface (UI) components such as modals, drag-and-drop interfaces, infinite scroll regions, and single-page application (SPA) navigation patterns.
+
+According to industry estimates, the global count of active websites exceeded 1.1 billion by 2024, with web application complexity growing at an exponential rate driven by the adoption of frameworks such as React, Angular, and Vue.js on the frontend and microservices-based backends powered by Spring Boot, Node.js, and Django~\cite{playwright2024}. This complexity has profound implications for quality assurance (QA). A single modern web application may expose hundreds of distinct user-facing routes, each containing dozens of interactive elements whose behaviour depends on application state, user roles, network conditions, and browser-specific rendering engines.
+
+The traditional approach to ensuring quality---wherein human testers manually navigate through the application, verify expected behaviours, and document defects---is increasingly untenable. The gap between the rate at which new features are developed and deployed (often multiple times per day in continuous deployment pipelines) and the rate at which those features can be manually verified has widened to a critical degree. Automated testing frameworks such as Selenium~\cite{selenium2004} and, more recently, Playwright~\cite{playwright2024} have partially bridged this gap by enabling programmatic browser control. However, these tools require significant human effort to author, maintain, and update test scripts---effort that scales linearly with application complexity.
+
+The advent of powerful Large Language Models (LLMs) such as GPT-4~\cite{openai2023gpt4}, built upon the Transformer architecture~\cite{vaswani2017attention}, has opened an entirely new frontier. These models demonstrate remarkable capabilities in understanding natural language descriptions of software behaviour, reasoning about UI semantics from structural representations such as the Document Object Model (DOM), and generating syntactically and semantically correct test code. The AI Test Agent project was conceived at the intersection of these technological currents: leveraging LLM-based reasoning to autonomously understand web application workflows and generate executable test cases, while utilising Playwright for deterministic, real-browser test execution.
+
+
+% ============================================================
+\section{Software Testing Overview}
+\label{sec:testing_overview}
+
+Software testing is a systematic process of evaluating a software system or its components to verify that it satisfies specified requirements and to identify defects~\cite{istqb2023}. It is an integral part of the SDLC and serves as the primary mechanism for quality assurance. The IEEE Standard 829~\cite{ieee829} defines software testing documentation standards that govern how test plans, test cases, and test reports are structured in professional practice.
+
+Software testing can be classified along several dimensions. The most fundamental classification is based on the \emph{level} of testing, which corresponds to the granularity of the system component under test:
+
+\begin{enumerate}
+    \item \textbf{Unit Testing:} Unit testing focuses on verifying the correctness of individual units of source code---typically functions, methods, or classes---in isolation from the rest of the system. Unit tests are authored by developers and are executed frequently during development, often as part of continuous integration pipelines. Frameworks such as JUnit (Java), pytest (Python), and Jest (JavaScript) are widely used for unit testing. The primary advantage of unit testing lies in its ability to localise defects to specific code units, enabling rapid diagnosis and correction.
+
+    \item \textbf{Integration Testing:} Integration testing examines the interactions between integrated units or modules to detect interface defects. After individual units have been verified, integration testing ensures that they function correctly when combined. This level of testing is particularly important in microservices architectures, where services communicate via network protocols (HTTP, gRPC, message queues), and subtle issues such as data format mismatches, authentication failures, or timeout behaviours may emerge only when services interact.
+
+    \item \textbf{System Testing:} System testing evaluates the complete, integrated system against its specified requirements. It is conducted in an environment that closely mirrors the production deployment and covers both functional requirements (e.g., ``the user can successfully submit a registration form'') and non-functional requirements (e.g., performance under load, security against common vulnerabilities). System testing treats the application as a black box, exercising it through its external interfaces---primarily the user interface for web applications.
+
+    \item \textbf{Acceptance Testing:} Acceptance testing determines whether the system meets the acceptance criteria defined by stakeholders and is ready for deployment. User Acceptance Testing (UAT) involves end users or their representatives exercising the system in realistic scenarios. In agile methodologies, acceptance criteria are often expressed as user stories with associated acceptance tests that must pass before a feature is considered complete.
+\end{enumerate}
+
+Beyond the level-based classification, testing is also categorised by \emph{approach}:
+
+\begin{itemize}
+    \item \textbf{Black-Box Testing:} Tests are designed based on the external specification of the system without knowledge of its internal implementation. Techniques include equivalence partitioning, boundary value analysis, and state transition testing.
+    \item \textbf{White-Box Testing:} Tests are designed with knowledge of the internal code structure. Techniques include statement coverage, branch coverage, and path coverage analysis.
+    \item \textbf{Grey-Box Testing:} A hybrid approach that combines elements of both black-box and white-box testing, often used in integration and security testing.
+\end{itemize}
+
+Furthermore, testing encompasses specialised types such as \textbf{regression testing} (re-executing tests after code changes to ensure no existing functionality is broken), \textbf{smoke testing} (a preliminary test to verify that the most critical functions work), \textbf{performance testing} (evaluating system responsiveness and stability under load), and \textbf{security testing} (identifying vulnerabilities such as SQL injection, cross-site scripting, and authentication bypasses).
+
+The AI Test Agent project operates primarily at the \textbf{system testing} level, treating the web application under test as a black box and interacting with it through its browser-rendered user interface. The system autonomously generates and executes functional test cases that verify user-facing workflows, thereby addressing the most labour-intensive and time-consuming tier of the testing pyramid.
+
+
+% ============================================================
+\section{Traditional Manual Testing}
+\label{sec:manual_testing}
+
+Traditional manual testing involves human testers directly interacting with the software application to identify defects, verify functionality, and validate that the system meets its requirements. Despite the growing adoption of automation, manual testing remains prevalent across the industry, particularly for exploratory testing, usability evaluation, and testing of novel features where automated scripts do not yet exist.
+
+The manual testing process typically follows a structured workflow:
+
+\begin{enumerate}
+    \item \textbf{Test Planning:} A test manager or lead creates a test plan that defines the scope, approach, resources, schedule, and deliverables of the testing effort. The test plan identifies the features to be tested, the testing techniques to be employed, and the entry and exit criteria for each testing phase, in accordance with standards such as IEEE 829~\cite{ieee829}.
+
+    \item \textbf{Test Case Design:} QA engineers analyse requirements documents, user stories, and design specifications to derive test cases. Each test case specifies a unique identifier, preconditions, input data, a sequence of test steps, expected results, and postconditions. For a web application, a typical test case might specify: ``Navigate to the login page, enter valid credentials, click the Submit button, and verify that the user is redirected to the dashboard.''
+
+    \item \textbf{Test Environment Setup:} The test environment---including the application server, database, network configuration, and browser versions---is configured to replicate the production environment as closely as possible. Environment discrepancies are a common source of false positives and false negatives in testing.
+
+    \item \textbf{Test Execution:} Testers manually execute each test case by following the prescribed steps, interacting with the application through its user interface, and observing the actual outcomes. The tester compares the actual result with the expected result and records the outcome as Pass or Fail.
+
+    \item \textbf{Defect Reporting:} When a test case fails, the tester creates a defect report (bug report) that includes the defect summary, severity, priority, steps to reproduce, expected versus actual behaviour, screenshots or screen recordings, and environment details. Bug reports are submitted to a defect tracking system such as Jira, Bugzilla, or Azure DevOps.
+
+    \item \textbf{Regression Testing:} After developers fix reported defects, testers re-execute the failed test cases to verify the fix and also re-execute a broader set of test cases to ensure that the fix has not introduced new defects (regression). This cycle of fix--verify--regress is repeated until the exit criteria are met.
+\end{enumerate}
+
+The human roles involved in manual testing include \textbf{QA Analysts} (who design test cases), \textbf{QA Engineers/Testers} (who execute tests), \textbf{Test Leads/Managers} (who plan and coordinate testing activities), and \textbf{Business Analysts/Product Owners} (who define acceptance criteria). In many organisations, a single individual may fulfil multiple roles.
+
+Manual testing offers certain undeniable advantages: human testers possess intuition, domain knowledge, and the ability to detect subtle usability and aesthetic issues that automated tools cannot easily identify. Exploratory testing---an approach wherein the tester simultaneously learns about the application, designs tests, and executes them---relies heavily on human judgement and creativity.
+
+However, as discussed in the following section, the limitations of manual testing become severe as application complexity and release frequency increase.
+
+
+% ============================================================
+\section{Challenges in Existing Testing Approaches}
+\label{sec:challenges}
+
+Both manual testing and traditional script-based automated testing face significant challenges that impede the efficiency and effectiveness of quality assurance in modern web development:
+
+\subsection{Time-Intensive Nature of Manual Testing}
+\label{subsec:time_intensive}
+
+Manual test execution is inherently slow. A human tester can execute at most a few dozen test cases per day for a complex web application, whereas a modern continuous integration pipeline may produce multiple new builds daily. The time required to manually regress an entire application after each build is prohibitive, leading to either delayed releases or insufficient test coverage. Studies in the testing literature indicate that manual regression testing can consume up to 60--80\% of the total testing effort in large projects~\cite{istqb2023}.
+
+\subsection{Human Error and Inconsistency}
+\label{subsec:human_error}
+
+Manual testing is susceptible to human error. Testers may inadvertently skip test steps, misinterpret expected results, or fail to notice subtle UI anomalies due to fatigue or cognitive overload. Furthermore, different testers may execute the same test case in slightly different ways, leading to inconsistent results. This variability undermines the repeatability and reliability of the testing process.
+
+\subsection{Scalability Limitations}
+\label{subsec:scalability}
+
+As the application under test grows in size and complexity, the number of test cases required to achieve adequate coverage grows combinatorially. Manual testing does not scale: doubling the number of features approximately doubles (or more) the number of test cases and the time required to execute them. Cross-browser testing (verifying behaviour across Chrome, Firefox, Safari, and Edge) and cross-device testing (desktop, tablet, mobile) further multiply the testing matrix.
+
+\subsection{Test Script Maintenance Burden}
+\label{subsec:maintenance}
+
+Traditional automated testing tools such as Selenium~\cite{selenium2004} address the speed and consistency limitations of manual testing by enabling programmatic browser control. However, they introduce a new challenge: \textbf{test script maintenance}. Automated test scripts are tightly coupled to the application's UI structure---element locators (CSS selectors, XPaths, IDs) become invalid whenever the UI is refactored, causing tests to fail even when the underlying functionality is correct. Studies report that test maintenance can consume 40--60\% of the total automation effort, often negating the productivity gains of automation.
+
+\subsection{Repetitive and Monotonous Nature}
+\label{subsec:repetitive}
+
+Regression testing, by its very definition, involves the repeated execution of the same test cases across successive builds. This repetitive work is demotivating for skilled QA professionals and represents an inefficient utilisation of human cognitive resources. The monotony contributes to decreased attention and increased error rates over time.
+
+\subsection{Limited Adaptability to UI Changes}
+\label{subsec:adaptability}
+
+Traditional automated tests are brittle in the face of UI changes. A simple refactoring of the HTML structure---such as changing a \texttt{<div>} to a \texttt{<section>} or renaming a CSS class---can break dozens of automated test scripts simultaneously. The effort required to update these scripts after each UI change discourages teams from maintaining comprehensive automated test suites, leading to a gradual erosion of automated test coverage.
+
+\subsection{Lack of Intelligent Failure Analysis}
+\label{subsec:failure_analysis}
+
+When a traditional automated test fails, it typically produces a generic error message (e.g., ``Element not found'' or ``Assertion failed''). Diagnosing the root cause requires manual investigation by a developer or QA engineer, who must examine screenshots, log files, and application state to understand why the failure occurred. This diagnostic process is time-consuming and requires significant domain expertise.
+
+The AI Test Agent addresses each of these challenges through its autonomous, AI-driven approach: LLM-based reasoning enables adaptive understanding of UI structure without brittle selectors; autonomous exploration eliminates the need for manually authored test scripts; real-browser execution via Playwright ensures consistent, repeatable test runs; and AI-powered failure analysis produces intelligent, context-rich bug reports that accelerate defect resolution.
+
+
+% ============================================================
+\section{Motivation}
+\label{sec:motivation}
+
+The motivation for the AI Test Agent project arises from a fundamental asymmetry in the current state of AI-assisted software engineering. Over the past several years, AI-powered code generation tools---such as GitHub Copilot, Amazon CodeWhisperer, and ChatGPT---have dramatically accelerated the speed at which software is written. Developers routinely use LLMs to generate boilerplate code, implement algorithms, and even scaffold entire application modules. This acceleration in code production has further compressed release cycles and intensified the pressure on QA teams.
+
+However, a conspicuous gap exists on the \emph{testing} side of the development workflow. While AI has been extensively applied to code generation, its application to \emph{autonomous testing}---the ability to independently explore a web application, understand its workflows, generate test cases, execute them, and report failures---remains nascent. Most existing AI-assisted testing tools focus on narrow tasks such as generating unit tests for individual functions or predicting which tests are likely to fail. Few, if any, provide end-to-end autonomous testing of web applications at the system level.
+
+This gap creates a dangerous imbalance: code is produced faster than it can be tested, leading to increased defect escape rates, degraded software quality, and elevated technical debt. The AI Test Agent was developed to close this gap by bringing the same level of AI-powered autonomy to testing that already exists for code generation.
+
+Several converging technological enablers made this project feasible:
+
+\begin{itemize}
+    \item \textbf{Advances in Large Language Models:} The release of GPT-4~\cite{openai2023gpt4} and similar models demonstrated that LLMs can reason about complex, structured inputs such as HTML DOM trees, understand the semantic purpose of UI elements (e.g., distinguishing a login form from a registration form), and generate syntactically correct Playwright test scripts from natural-language descriptions of expected behaviour.
+
+    \item \textbf{Mature Browser Automation Frameworks:} Playwright~\cite{playwright2024} provides a modern, reliable API for controlling Chromium, Firefox, and WebKit browsers. Unlike earlier tools such as Selenium~\cite{selenium2004}, Playwright offers auto-waiting for elements, network interception, and native support for modern web features such as Shadow DOM, iframes, and single-page application routing.
+
+    \item \textbf{Microservices Architecture Patterns:} The widespread adoption of microservices architecture patterns, service discovery (Eureka), API gateways, and containerised deployments enables the construction of distributed systems with clear separation of concerns, independent scalability, and fault isolation---all of which are essential for a production-grade testing platform.
+
+    \item \textbf{The Transformer Architecture:} The Transformer architecture~\cite{vaswani2017attention}, which underpins modern LLMs, provides the attention mechanism necessary for processing long-context inputs such as full-page DOM snapshots and generating coherent, contextually appropriate test code.
+\end{itemize}
+
+The AI Test Agent was therefore motivated by the need to create an \emph{intelligent, autonomous testing platform} that eliminates the manual effort of test case authoring, adapts to UI changes without script maintenance, and provides AI-powered defect analysis---thereby restoring the balance between the velocity of modern software development and the rigour of quality assurance.
+
+
+% ============================================================
+\section{Problem Statement}
+\label{sec:problem_statement}
+
+The increasing complexity of modern web applications, coupled with the accelerating pace of software releases driven by agile and DevOps methodologies, has rendered traditional manual and script-based automated testing approaches inadequate. Manual testing is too slow, error-prone, and labour-intensive to keep pace with continuous delivery pipelines. Script-based automated testing, while faster, imposes a significant maintenance burden due to the tight coupling between test scripts and the application's UI structure, leading to brittle test suites that break with every UI change.
+
+Formally, the problem addressed by this project is stated as follows:
+
+\begin{quote}
+\emph{Design and develop an autonomous, AI-driven web application testing platform that can independently explore a target web application, understand its user-facing workflows through intelligent analysis of UI structure, automatically generate functional test cases, execute them in real browser environments, classify test outcomes, and produce detailed, AI-analysed bug reports---without requiring manually authored test scripts or human intervention during the testing process.}
+\end{quote}
+
+The system must satisfy the following constraints:
+\begin{itemize}
+    \item The platform must operate on any publicly accessible web application, without requiring access to the application's source code or internal APIs.
+    \item Test generation and failure analysis must be performed by AI (LLM-based reasoning), not by rule-based heuristics alone.
+    \item Browser interaction must be performed through a real browser automation framework (Playwright), not through simulated HTTP requests, ensuring that client-side rendering, JavaScript execution, and dynamic content loading are accurately represented.
+    \item The system must be architected as a set of independently deployable microservices to ensure scalability, maintainability, and fault isolation.
+\end{itemize}
+
+
+% ============================================================
+\section{Objectives}
+\label{sec:objectives}
+
+The AI Test Agent project was developed with the following six primary objectives:
+
+\begin{enumerate}
+    \item \textbf{Automated Web Application Exploration:} Develop an exploration engine capable of autonomously crawling a target web application, discovering its pages, routes, and interactive elements (links, buttons, forms, navigation menus), and constructing a structured representation of the application's UI topology. The exploration engine uses real-browser navigation via Playwright to handle dynamic content, JavaScript-rendered pages, and single-page application routing.
+
+    \item \textbf{AI-Driven Workflow Understanding:} Leverage Large Language Models to analyse the explored UI structure and infer meaningful user workflows. Given the DOM structure, element attributes, labels, and page context, the LLM identifies logical user journeys---such as login flows, registration processes, search operations, and form submissions---and determines the sequence of interactions required to complete each workflow.
+
+    \item \textbf{AI-Powered Test Case Generation:} Utilise LLM-based reasoning to automatically generate executable test cases for the identified workflows. Each generated test case includes a descriptive title, a sequence of browser interaction steps (navigation, clicking, typing, selecting, asserting), expected outcomes, and appropriate assertions. The generated tests are expressed as Playwright-compatible code that can be directly executed without manual modification.
+
+    \item \textbf{Real Browser Test Execution via Playwright:} Execute the generated test cases in real browser environments using the Playwright framework~\cite{playwright2024}. The execution engine launches browser instances, runs each test case by performing the specified interactions, captures screenshots at key steps, records console logs and network requests, and collects execution metadata including timing information and browser version.
+
+    \item \textbf{Intelligent Failure Detection and Classification:} Implement a robust test outcome classification system that categorises each test execution into one of four states: \textbf{PASS} (all assertions succeeded), \textbf{FAIL} (one or more assertions did not hold), \textbf{TIMEOUT} (the test exceeded its maximum allowed execution time), or \textbf{ERROR} (an unexpected exception occurred during execution, such as a browser crash or network failure). This classification provides immediate, actionable feedback on the health of the application.
+
+    \item \textbf{Automated Intelligent Bug Reporting:} For test cases that result in FAIL, TIMEOUT, or ERROR outcomes, automatically generate comprehensive bug reports using AI-powered analysis. The bug reports include a summary of the failure, the specific step at which the failure occurred, the expected versus actual behaviour, severity assessment, potential root cause analysis, and remediation suggestions---all produced by LLM reasoning over the test execution context, screenshots, and error logs.
+\end{enumerate}
+
+
+% ============================================================
+\section{Scope of the Project}
+\label{sec:scope}
+
+The scope of the AI Test Agent project is defined by the following inclusions and exclusions:
+
+\subsection{In Scope}
+\label{subsec:in_scope}
+
+\begin{itemize}
+    \item \textbf{Functional UI Testing:} The system performs functional testing of web application user interfaces, verifying that user-facing workflows behave as expected. This includes testing form submissions, navigation flows, authentication processes, search functionality, and CRUD (Create, Read, Update, Delete) operations.
+
+    \item \textbf{Cross-Browser Support:} Test execution supports Chromium-based browsers through Playwright, with the architecture designed to extend to Firefox and WebKit.
+
+    \item \textbf{Autonomous Operation:} The system operates autonomously from exploration through test execution and bug reporting, without requiring manually authored test scripts or real-time human supervision.
+
+    \item \textbf{AI-Powered Analysis:} LLMs are used for workflow understanding, test case generation, and failure analysis. The system supports integration with OpenAI-compatible LLM APIs.
+
+    \item \textbf{Microservices Architecture:} The backend is architected as a set of seven microservices with clear separation of concerns, service discovery via Eureka, and API gateway routing.
+
+    \item \textbf{Web-Based Dashboard:} A React-based frontend provides users with the ability to initiate testing sessions, monitor progress, view test results, and review generated bug reports.
+
+    \item \textbf{Persistent Data Storage:} Test configurations, exploration results, generated test cases, execution outcomes, and bug reports are persisted in PostgreSQL databases.
+\end{itemize}
+
+\subsection{Out of Scope}
+\label{subsec:out_of_scope}
+
+\begin{itemize}
+    \item \textbf{Performance and Load Testing:} The system does not perform performance benchmarking, stress testing, or load testing of the target application.
+
+    \item \textbf{Security Testing:} Specialised security testing activities such as penetration testing, vulnerability scanning, and fuzzing are not included, although the system may incidentally detect certain security-related UI behaviours.
+
+    \item \textbf{Mobile Application Testing:} The system is designed for web applications rendered in desktop and responsive web browsers; native mobile application testing (iOS/Android) is not supported.
+
+    \item \textbf{API-Level Testing:} The system tests applications through their browser-rendered user interfaces, not through direct API invocation. API contract testing and integration testing at the API level are outside the scope.
+
+    \item \textbf{Source Code Analysis:} The system operates as a black-box testing tool and does not analyse or require access to the target application's source code.
+
+    \item \textbf{Test Data Generation for Domain-Specific Applications:} While the system generates generic test inputs (e.g., email addresses, passwords, names), it does not generate domain-specific test data (e.g., valid insurance policy numbers or medical record identifiers).
+\end{itemize}
+
+
+% ============================================================
+\section{Overview of AI Test Agent}
+\label{sec:system_overview}
+
+The AI Test Agent is a full-stack, microservices-based platform that automates the entire web application testing lifecycle---from exploration and understanding through test generation, execution, and intelligent bug reporting. The system architecture, as shown in Figure~\ref{fig:system_architecture}, comprises seven backend microservices, a React-based frontend application, PostgreSQL databases for persistent storage, the Playwright browser automation framework for real-browser interaction, and integration with LLM APIs for AI-powered reasoning.
+
+A central architectural principle of the AI Test Agent is the \textbf{separation of reasoning from interaction}: the AI (LLM) performs all cognitive tasks---understanding application structure, inferring workflows, generating test logic, and analysing failures---while Playwright handles all browser-level interactions---navigating to URLs, clicking elements, filling forms, capturing screenshots, and observing page state. This separation ensures that the AI's reasoning capabilities are leveraged where they provide the greatest value, while browser interaction remains deterministic and reliable.
+
+The seven backend microservices are:
+
+\begin{enumerate}
+    \item \textbf{Authentication Service (Auth Service):} Manages user registration, authentication, and JWT-based authorisation. All API requests are authenticated through this service, ensuring secure access to the platform's functionality.
+
+    \item \textbf{API Gateway:} Serves as the single entry point for all client requests. The gateway performs request routing, load balancing, and cross-cutting concerns such as rate limiting and CORS handling. It routes requests to the appropriate downstream microservice based on the URL path and HTTP method.
+
+    \item \textbf{Service Discovery (Eureka Server):} Implements the service registry pattern using Netflix Eureka. Each microservice registers itself with the Eureka server upon startup and discovers other services dynamically, enabling location-transparent inter-service communication without hard-coded hostnames or ports.
+
+    \item \textbf{Exploration Service:} Responsible for autonomously crawling and exploring the target web application. The service launches a Playwright browser instance, navigates through the application's pages, extracts DOM structure, identifies interactive elements (links, buttons, forms, input fields), and records the application's page topology. The exploration results are persisted and provided as input to the test generation phase.
+
+    \item \textbf{Test Generation and AI Service (Test/AI Service):} Receives the exploration results and uses LLM-based reasoning to understand the application's workflows and generate executable test cases. The service constructs carefully engineered prompts that include the DOM structure, element attributes, page context, and workflow descriptions, and sends these prompts to an LLM API (e.g., GPT-4~\cite{openai2023gpt4}). The LLM's response---a set of test cases with step-by-step browser interactions and assertions---is parsed, validated, and stored.
+
+    \item \textbf{Execution Service:} Executes the generated test cases in real Playwright browser instances. For each test case, the service launches a browser, performs the specified sequence of interactions (navigate, click, type, select, assert), captures screenshots at critical steps, records console output and network activity, measures execution time, and classifies the outcome as PASS, FAIL, TIMEOUT, or ERROR. Execution results, including all captured artefacts, are persisted for review and analysis.
+
+    \item \textbf{Bug Analysis Service:} Processes test executions that resulted in non-PASS outcomes. The service collects the test case definition, execution logs, error messages, screenshots, and page state at the point of failure, and submits this context to an LLM for intelligent failure analysis. The LLM generates a structured bug report that includes a failure summary, root cause hypothesis, severity assessment, affected workflow, and suggested remediation steps. These reports are stored and presented to the user through the frontend dashboard.
+\end{enumerate}
+
+The \textbf{React frontend} provides a modern, responsive single-page application through which users interact with the platform. Key frontend features include project configuration (specifying the target URL and authentication credentials), real-time exploration progress monitoring, test case review and editing, test execution dashboards with pass/fail statistics, and detailed bug report viewing with associated screenshots and logs.
+
+\textbf{PostgreSQL} serves as the primary relational database management system, with each microservice maintaining its own database schema in accordance with the database-per-service pattern recommended for microservices architectures. This isolation ensures that schema changes in one service do not affect others and enables independent data management.
+
+The overall testing workflow proceeds as follows: the user specifies a target web application URL through the React frontend; the Exploration Service autonomously crawls the application and builds a structural map; the Test/AI Service analyses the exploration data using an LLM and generates test cases; the Execution Service runs the test cases in Playwright browsers and records results; and the Bug Analysis Service generates intelligent bug reports for any failures. The entire pipeline operates autonomously once initiated, with results presented to the user upon completion.
+
+
+% ============================================================
+\section{Organization of the Report}
+\label{sec:report_organization}
+
+The remainder of this report is organised as follows:
+
+\begin{itemize}
+    \item \textbf{Chapter~\ref{chap:litsurvey}: Literature Survey} reviews the existing body of work in automated software testing, AI-assisted testing, browser automation frameworks, and LLM-based code generation. The chapter analyses the strengths and limitations of prior approaches and identifies the research gaps that the AI Test Agent addresses.
+
+    \item \textbf{Chapter~\ref{chap:methodology}: Methodology} describes the software development methodology adopted for the project, including the agile development process, microservices design principles, and the AI pipeline architecture. The chapter also details the system requirements---both functional and non-functional---and the technology stack selection rationale.
+
+    \item \textbf{Chapter~\ref{chap:design}: System Design} presents the detailed architectural design of the AI Test Agent, including the high-level system architecture, individual microservice designs, database schema designs, API specifications, and the interaction patterns between services. UML diagrams including use case diagrams, sequence diagrams, and component diagrams are provided.
+
+    \item \textbf{Chapter~\ref{chap:implementation}: Implementation} documents the implementation details of each microservice and the frontend application, including key code structures, algorithm descriptions, LLM prompt engineering strategies, Playwright integration patterns, and inter-service communication mechanisms.
+
+    \item \textbf{Chapter~\ref{chap:results}: Results and Discussion} presents the outcomes of testing the AI Test Agent on sample web applications, including exploration coverage metrics, test generation quality analysis, execution pass/fail distributions, and bug report accuracy assessments. The chapter discusses the system's strengths, limitations, and observations.
+
+    \item \textbf{Chapter~\ref{chap:conclusion}: Conclusion and Future Work} summarises the contributions of the project, reflects on the objectives achieved, discusses the limitations encountered, and outlines directions for future enhancement---including support for additional LLM providers, visual regression testing, and CI/CD pipeline integration.
+\end{itemize}

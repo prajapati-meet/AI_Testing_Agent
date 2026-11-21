@@ -14,3 +14,7 @@ spring:
 eureka:
   client:
     enabled: false
+
+jwt:
+  secret: default_dev_jwt_secret_key_for_local_testing_only_32_bytes
+  expiration-ms: 86400000

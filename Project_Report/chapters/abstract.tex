@@ -1,0 +1,19 @@
+%%=============================================================================
+%% ABSTRACT
+%%=============================================================================
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+\begin{spacing}{1.8}
+Software testing is a critical phase in the software development lifecycle, responsible for ensuring the quality, reliability, and correctness of web applications. Traditional manual testing approaches require significant human effort to understand application workflows, design test cases, execute them against the application, identify failures, and produce detailed bug reports. These processes are time-consuming, error-prone, and difficult to scale as application complexity increases.
+
+Existing automated testing tools, while effective for executing predefined scripts, still depend on human testers to analyze the application, identify meaningful workflows, and author test cases. Recent advances in artificial intelligence, particularly large language models (LLMs) and agentic AI systems, present an opportunity to bridge this gap by introducing intelligent reasoning capabilities into the testing pipeline.
+
+This project presents \textbf{AI Test Agent}, an autonomous AI-based web application testing and intelligent bug reporting platform developed using a microservices architecture. The system accepts a target web application URL and autonomously performs the complete testing workflow: exploration, test generation, execution, failure detection, and bug reporting.
+
+The platform consists of seven logically independent microservices: an \textbf{Authentication Service} for secure user management with JWT-based authentication, an \textbf{API Gateway} built with Spring Cloud Gateway for centralized request routing, a \textbf{Service Registry} using Eureka for dynamic service discovery, an \textbf{Exploration Service} that uses Playwright to inspect the target application and discover pages, links, buttons, forms, and input fields, a \textbf{Test/AI Service} that communicates with an LLM to understand discovered workflows and generate structured functional test cases, an \textbf{Execution Service} that uses Playwright to perform browser-based test execution with assertion validation and evidence capture, and a \textbf{Bug Analysis Service} that employs an LLM to analyze failed executions and generate structured, developer-friendly bug reports.
+
+A key architectural principle of this system is the clear separation of AI reasoning and deterministic browser automation. The LLM performs cognitive tasks such as workflow understanding, test scenario generation, and failure analysis, while Playwright handles all actual browser interactions including navigation, form filling, clicking, assertion verification, and screenshot capture. This combination of AI reasoning with deterministic execution produces reliable and interpretable testing outcomes.
+
+The system was implemented using React.js for the frontend dashboard, Java with Spring Boot for the backend microservices, PostgreSQL with a database-per-service pattern, and Git for version control. The implemented platform demonstrates the feasibility of autonomous, AI-driven web application testing as an integrated end-to-end solution.
+\end{spacing}

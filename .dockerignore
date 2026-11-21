@@ -1,0 +1,12 @@
+**/.git
+**/.gitignore
+**/.idea
+**/.vscode
+**/target
+**/node_modules
+**/dist
+**/*.log
+**/*.dump
+**/*.dumpstream
+**/demo-screenshot-*.png
+PROJECT_IMPLEMENTATION_ROADMAP.md
