@@ -4,6 +4,7 @@ import com.aitestagent.execution.dto.ExecutionRequest;
 import com.aitestagent.execution.dto.ExecutionResponse;
 import com.aitestagent.execution.service.ExecutionService;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,6 +41,14 @@ public class ExecutionController {
         return ResponseEntity.ok(executionService.getExecutionById(id));
     }
 
+    @GetMapping(value = "/{id}/screenshot", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<byte[]> getScreenshot(@PathVariable Long id) {
+        byte[] imageBytes = executionService.getExecutionScreenshot(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .body(imageBytes);
+    }
+
     @GetMapping("/demo")
     public ResponseEntity<String> runDemoPoC() {
         try (com.microsoft.playwright.Playwright playwright = com.microsoft.playwright.Playwright.create()) {
@@ -48,14 +57,8 @@ public class ExecutionController {
             );
             com.microsoft.playwright.Page page = browser.newPage();
             page.navigate("http://localhost:3000");
-            
-            // Wait a moment for React to render the home page
             page.waitForTimeout(1000);
-            
-            // Make Playwright actually INTERACT with the page by clicking the Products button
             page.click("text='Browse Products'");
-            
-            // Wait for the Products page to load
             page.waitForTimeout(1000);
             
             String screenshotName = "demo-screenshot-latest.png";
