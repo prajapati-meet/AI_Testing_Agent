@@ -121,7 +121,8 @@ public class LlmBugAnalysisService {
         sb.append("  \"stepsToReproduce\": \"Numbered step-by-step reproduction instructions\",\n");
         sb.append("  \"expectedResult\": \"What should have happened\",\n");
         sb.append("  \"actualResult\": \"What actually occurred (including UI error messages or rejected state)\",\n");
-        sb.append("  \"possibleArea\": \"Suspected component, service, or application module\"\n");
+        sb.append("  \"possibleArea\": \"Suspected component, service, or application module\",\n");
+        sb.append("  \"suggestedFix\": \"Concrete step-by-step developer solution and code fix explaining exactly how to solve this bug, including code snippet or patch\"\n");
         sb.append("}\n");
 
         return sb.toString();
@@ -133,9 +134,12 @@ public class LlmBugAnalysisService {
         // Check if Gemini
         if (effectiveEndpoint.contains("generativelanguage.googleapis.com") ||
                 (effectiveEndpoint.isEmpty() && model != null && model.toLowerCase().contains("gemini"))) {
+            String cleanModel = (model != null && !model.isBlank())
+                    ? model.trim().toLowerCase().replaceAll("\\s+", "-").replace("models/", "")
+                    : "gemini-3.5-flash-lite";
             String geminiUrl = !effectiveEndpoint.isEmpty()
                     ? effectiveEndpoint
-                    : "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + apiKey;
+                    : "https://generativelanguage.googleapis.com/v1beta/models/" + cleanModel + ":generateContent?key=" + apiKey;
 
             Map<String, Object> payload = Map.of(
                     "contents", List.of(
@@ -149,14 +153,32 @@ public class LlmBugAnalysisService {
                     )
             );
 
-            String responseBody = restClient.post()
-                    .uri(geminiUrl)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(payload)
-                    .retrieve()
-                    .body(String.class);
+            Exception lastEx = null;
+            for (int attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    String responseBody = restClient.post()
+                            .uri(geminiUrl)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(payload)
+                            .retrieve()
+                            .body(String.class);
 
-            return extractGeminiText(responseBody);
+                    return extractGeminiText(responseBody);
+                } catch (Exception ex) {
+                    lastEx = ex;
+                    log.warn("Gemini bug analysis attempt #{} failed: {}. Retrying in {}ms...",
+                            attempt, ex.getMessage(), attempt * 1500);
+                    try {
+                        Thread.sleep(attempt * 1500L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+            if (lastEx != null) {
+                throw new RuntimeException("Gemini bug analysis failed after retries: " + lastEx.getMessage(), lastEx);
+            }
+            return "";
         } else {
             // OpenAI compatible
             String openAiUrl = !effectiveEndpoint.isEmpty()
@@ -241,6 +263,7 @@ public class LlmBugAnalysisService {
         report.setExpectedResult(dto.expectedResult() != null ? dto.expectedResult().trim() : "");
         report.setActualResult(dto.actualResult() != null ? dto.actualResult().trim() : "");
         report.setPossibleArea(dto.possibleArea() != null ? dto.possibleArea().trim() : "");
+        report.setSuggestedFix(dto.suggestedFix() != null ? dto.suggestedFix().trim() : "");
         report.setEvidencePath(execution != null ? execution.screenshotPath() : null);
         report.setCreatedAt(LocalDateTime.now());
 
@@ -309,6 +332,7 @@ public class LlmBugAnalysisService {
             report.setExpectedResult("User credentials are accepted and the browser navigates to /dashboard with active session.");
             report.setActualResult(!errorMessage.isBlank() ? errorMessage : "Login failed: Authentication service returned an unexpected error (BUG_MODE=true).");
             report.setPossibleArea("Authentication Controller & Service (/api/auth/login or demo-target-app BUG_MODE toggle)");
+            report.setSuggestedFix("In LoginPage (demo-target-app/src/App.jsx), ensure that when invalid credentials are submitted, the application updates component state to display the error banner:\n\n// Code Fix:\nif (email === DEMO_CONFIG.DEMO_EMAIL && password === DEMO_CONFIG.DEMO_PASSWORD) {\n  navigate('/dashboard');\n} else {\n  setError('Invalid email or password.'); // Fix: set error state so #login-error renders\n}");
         } else {
             String shortError = errorMessage.length() > 80 ? errorMessage.substring(0, 80) + "..." : errorMessage;
             report.setTitle(!errorMessage.isBlank() ? "Execution Failure: " + shortError : "Test Execution #" + executionId + " Assertion Failure");
@@ -321,6 +345,7 @@ public class LlmBugAnalysisService {
             report.setExpectedResult(testCase != null && testCase.expectedResult() != null ? testCase.expectedResult() : "Target element should be visible and step assertions should pass.");
             report.setActualResult(!errorMessage.isBlank() ? errorMessage : "Step execution failed with unhandled DOM error.");
             report.setPossibleArea("Frontend UI Component / Page Layout");
+            report.setSuggestedFix("Inspect the target selector '" + errorMessage + "' in the target page component. Ensure the element renders before Playwright asserts its visibility.");
         }
 
         return report;

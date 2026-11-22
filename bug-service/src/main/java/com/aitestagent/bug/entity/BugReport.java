@@ -49,6 +49,12 @@ public class BugReport {
     @Column(columnDefinition = "TEXT")
     private String possibleArea;
 
+    @Column(columnDefinition = "TEXT")
+    private String suggestedFix;
+
+    @Column(name = "user_email")
+    private String userEmail;
+
     @Column(length = 1024)
     private String evidencePath;
 
@@ -86,6 +92,14 @@ public class BugReport {
     }
 
     // Getters and Setters
+
+    public String getUserEmail() {
+        return userEmail;
+    }
+
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
+    }
 
     public Long getId() {
         return id;
@@ -157,6 +171,14 @@ public class BugReport {
 
     public void setPossibleArea(String possibleArea) {
         this.possibleArea = possibleArea;
+    }
+
+    public String getSuggestedFix() {
+        return suggestedFix;
+    }
+
+    public void setSuggestedFix(String suggestedFix) {
+        this.suggestedFix = suggestedFix;
     }
 
     public String getEvidencePath() {

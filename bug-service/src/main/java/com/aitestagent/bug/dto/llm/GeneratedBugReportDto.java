@@ -10,6 +10,7 @@ public record GeneratedBugReportDto(
         String stepsToReproduce,
         String expectedResult,
         String actualResult,
-        String possibleArea
+        String possibleArea,
+        String suggestedFix
 ) {
 }

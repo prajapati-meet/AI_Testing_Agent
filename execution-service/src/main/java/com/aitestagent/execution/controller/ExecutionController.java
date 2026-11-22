@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.RequestHeader;
+
 import java.util.List;
 
 @RestController
@@ -27,13 +29,15 @@ public class ExecutionController {
 
     @PostMapping
     public ResponseEntity<ExecutionResponse> triggerExecution(
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
             @RequestBody(required = false) ExecutionRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(executionService.triggerExecution(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(executionService.triggerExecution(request, userEmail));
     }
 
     @GetMapping
-    public ResponseEntity<List<ExecutionResponse>> getAllExecutions() {
-        return ResponseEntity.ok(executionService.getAllExecutions());
+    public ResponseEntity<List<ExecutionResponse>> getAllExecutions(
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail) {
+        return ResponseEntity.ok(executionService.getAllExecutions(userEmail));
     }
 
     @GetMapping("/{id}")

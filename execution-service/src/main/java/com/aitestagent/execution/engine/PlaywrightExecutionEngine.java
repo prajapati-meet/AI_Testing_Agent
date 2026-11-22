@@ -128,9 +128,17 @@ public class PlaywrightExecutionEngine {
                 if (step.target() == null || step.target().isBlank()) {
                     throw new AssertionError("Target element selector is required for ASSERT_VISIBLE action");
                 }
-                page.waitForSelector(step.target().trim(), new Page.WaitForSelectorOptions().setTimeout(5000));
-                if (!page.isVisible(step.target().trim())) {
-                    throw new AssertionError("Element is not visible: " + step.target());
+                String selector = step.target().trim();
+                if (selector.startsWith("http://") || selector.startsWith("https://")) {
+                    String currentUrl = page.url();
+                    if (!currentUrl.contains(selector) && !selector.contains(currentUrl)) {
+                        throw new AssertionError("Expected current page URL to contain '" + selector + "', but actual URL was '" + currentUrl + "'");
+                    }
+                    return;
+                }
+                page.waitForSelector(selector, new Page.WaitForSelectorOptions().setTimeout(5000));
+                if (!page.isVisible(selector)) {
+                    throw new AssertionError("Element is not visible: " + selector);
                 }
             }
             case "ASSERT_TEXT" -> {
@@ -161,13 +169,13 @@ public class PlaywrightExecutionEngine {
         execution.setErrorMessage(formattedError);
 
         // Result classification:
-        // - Timeout -> TIMEOUT
-        // - Assertion error or element not found -> FAILED
+        // - Assertion error or missing expected element -> FAILED
+        // - General page load / navigation timeout -> TIMEOUT
         // - Unexpected crash -> ERROR
-        if (ex instanceof TimeoutError || isTimeoutException(ex)) {
-            execution.setStatus(ExecutionStatus.TIMEOUT);
-        } else if (ex instanceof AssertionError || isElementNotFound(ex)) {
+        if (ex instanceof AssertionError || isElementNotFound(ex)) {
             execution.setStatus(ExecutionStatus.FAILED);
+        } else if (ex instanceof TimeoutError || isTimeoutException(ex)) {
+            execution.setStatus(ExecutionStatus.TIMEOUT);
         } else {
             execution.setStatus(ExecutionStatus.ERROR);
         }
@@ -215,6 +223,8 @@ public class PlaywrightExecutionEngine {
             if (msg != null && (msg.contains("Element not found")
                     || msg.contains("not visible")
                     || msg.contains("waiting for selector")
+                    || msg.contains("waiting for locator")
+                    || msg.contains("to be visible")
                     || msg.contains("Target element selector is required"))) {
                 return true;
             }

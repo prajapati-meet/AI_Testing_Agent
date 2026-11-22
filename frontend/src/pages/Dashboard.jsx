@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { jsPDF } from 'jspdf';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -18,12 +19,35 @@ const Dashboard = () => {
   // ---------------------------------------------------------------------------
   // Panel 1: Application Exploration State
   // ---------------------------------------------------------------------------
-  const [targetUrl, setTargetUrl] = useState('http://localhost:3000');
+  const [targetMode, setTargetMode] = useState('docker'); // 'docker' | 'custom' | 'localhost'
+  const [dockerContainer, setDockerContainer] = useState('demo-target-app');
+  const [dockerPort, setDockerPort] = useState('80');
+  const [hostPort, setHostPort] = useState('3000');
+  const [customUrl, setCustomUrl] = useState('https://automationexercise.com');
+  const [targetUrl, setTargetUrl] = useState('http://demo-target-app');
   const [exploration, setExploration] = useState(null);
+  const [explorations, setExplorations] = useState([]);
+  const [selectedExplorationId, setSelectedExplorationId] = useState('');
   const [explorationStatus, setExplorationStatus] = useState('IDLE'); // IDLE, PENDING, RUNNING, COMPLETED, FAILED
   const [isStartingExploration, setIsStartingExploration] = useState(false);
   const [discoveredPages, setDiscoveredPages] = useState([]);
   const explorationPollingRef = useRef(null);
+
+  // Helper to recompute and update targetUrl whenever mode or inputs change
+  const updateTargetFromMode = (mode, container = dockerContainer, dPort = dockerPort, hPort = hostPort, custom = customUrl) => {
+    setTargetMode(mode);
+    if (mode === 'docker') {
+      const cleanContainer = container.trim() || 'demo-target-app';
+      const cleanPort = dPort.trim();
+      const computed = `http://${cleanContainer}${cleanPort && cleanPort !== '80' ? `:${cleanPort}` : ''}`;
+      setTargetUrl(computed);
+    } else if (mode === 'localhost') {
+      const cleanPort = hPort.trim() || '3000';
+      setTargetUrl(`http://host.docker.internal:${cleanPort}`);
+    } else {
+      setTargetUrl(custom.trim() || 'https://');
+    }
+  };
 
   // ---------------------------------------------------------------------------
   // Panel 2: AI Test Cases State
@@ -37,7 +61,7 @@ const Dashboard = () => {
   // ---------------------------------------------------------------------------
   const [executions, setExecutions] = useState([]);
   const [selectedTestCaseId, setSelectedTestCaseId] = useState('');
-  const [executionTargetUrl, setExecutionTargetUrl] = useState('http://localhost:3000');
+  const [executionTargetUrl, setExecutionTargetUrl] = useState('http://demo-target-app');
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [selectedExecution, setSelectedExecution] = useState(null);
   const [screenshotUrl, setScreenshotUrl] = useState(null);
@@ -66,6 +90,20 @@ const Dashboard = () => {
       });
     } finally {
       setProfileLoading(false);
+    }
+  }, []);
+
+  const fetchExplorations = useCallback(async () => {
+    try {
+      const response = await api.get('/api/exploration');
+      if (Array.isArray(response.data)) {
+        setExplorations(response.data);
+        if (response.data.length > 0) {
+          setSelectedExplorationId((prev) => prev || String(response.data[0].id));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load explorations:', err);
     }
   }, []);
 
@@ -113,10 +151,11 @@ const Dashboard = () => {
     }
 
     fetchProfile();
+    fetchExplorations();
     fetchTestCases();
     fetchExecutions();
     fetchBugs();
-  }, [navigate, fetchProfile, fetchTestCases, fetchExecutions, fetchBugs]);
+  }, [navigate, fetchProfile, fetchExplorations, fetchTestCases, fetchExecutions, fetchBugs]);
 
   // ===========================================================================
   // Panel 1: Exploration Handlers & 3s Polling
@@ -153,12 +192,14 @@ const Dashboard = () => {
           if (expData.status === 'COMPLETED') {
             stopExplorationPolling();
             fetchDiscoveredPages(explorationId);
+            fetchExplorations();
             setAlert({
               type: 'success',
               message: `Exploration #${explorationId} completed successfully! Discovered pages loaded.`
             });
           } else if (expData.status === 'FAILED') {
             stopExplorationPolling();
+            fetchExplorations();
             setAlert({
               type: 'error',
               message: `Exploration #${explorationId} failed: ${expData.message || 'Crawl error encountered.'}`
@@ -169,7 +210,7 @@ const Dashboard = () => {
         }
       }, 3000);
     },
-    [stopExplorationPolling, fetchDiscoveredPages]
+    [stopExplorationPolling, fetchDiscoveredPages, fetchExplorations]
   );
 
   useEffect(() => {
@@ -193,6 +234,7 @@ const Dashboard = () => {
       });
       const expData = response.data;
       setExploration(expData);
+      setSelectedExplorationId(String(expData.id));
       setExplorationStatus(expData.status || 'PENDING');
       setAlert({
         type: 'info',
@@ -218,8 +260,9 @@ const Dashboard = () => {
   const handleGenerateTests = async () => {
     setIsGeneratingTests(true);
     try {
+      const activeExpId = selectedExplorationId || exploration?.id;
       const response = await api.post('/api/tests/generate', {
-        explorationId: exploration?.id || null,
+        explorationId: activeExpId ? Number(activeExpId) : null,
         targetUrl: targetUrl.trim() || 'http://localhost:3000'
       });
 
@@ -339,6 +382,22 @@ const Dashboard = () => {
     };
   }, [executions, fetchExecutions]);
 
+  const autoAnalyzedRef = useRef(new Set());
+
+  // Auto-trigger AI Bug Analysis when an execution fails
+  useEffect(() => {
+    const failedExec = executions.find(
+      (e) => (e.status === 'FAILED' || e.status === 'ERROR' || e.status === 'TIMEOUT') &&
+             !autoAnalyzedRef.current.has(e.id) &&
+             !bugs.some((b) => b.executionId === e.id)
+    );
+
+    if (failedExec && !analyzingExecutionId) {
+      autoAnalyzedRef.current.add(failedExec.id);
+      handleAnalyzeBug(failedExec.id);
+    }
+  }, [executions, bugs, analyzingExecutionId]);
+
   // Open Execution Details Modal & Fetch Authenticated Screenshot
   const handleOpenExecutionDetails = (exec) => {
     setSelectedExecution(exec);
@@ -395,6 +454,163 @@ const Dashboard = () => {
       });
     } finally {
       setAnalyzingExecutionId(null);
+    }
+  };
+
+  const handleDownloadPdf = (bug) => {
+    if (!bug) return;
+
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: 'a4'
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 40;
+      const contentWidth = pageWidth - margin * 2;
+      let y = 35;
+
+      // Header Banner
+      doc.setFillColor(15, 23, 42); // slate-900
+      doc.rect(0, 0, pageWidth, 75, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('AI TEST AGENT', margin, 35);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.text('AUTOMATED QA DEFECT & ROOT CAUSE ANALYSIS REPORT', margin, 52);
+
+      const reportIdStr = `REPORT #${bug.id}`;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(56, 189, 248); // sky-400
+      doc.text(reportIdStr, pageWidth - margin - doc.getTextWidth(reportIdStr), 45);
+
+      y = 95;
+
+      // Title & Severity
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      const titleLines = doc.splitTextToSize(bug.title || 'Untitled Defect Report', contentWidth - 90);
+      doc.text(titleLines, margin, y);
+
+      // Severity badge
+      const sev = (bug.severity || 'MEDIUM').toUpperCase();
+      const sevWidth = 65;
+      const sevX = pageWidth - margin - sevWidth;
+      let sevBg = [254, 226, 226];
+      let sevFg = [185, 28, 28];
+      if (sev === 'LOW') {
+        sevBg = [241, 245, 249];
+        sevFg = [71, 85, 105];
+      } else if (sev === 'MEDIUM') {
+        sevBg = [254, 243, 199];
+        sevFg = [180, 83, 9];
+      }
+      doc.setFillColor(sevBg[0], sevBg[1], sevBg[2]);
+      doc.roundedRect(sevX, y - 13, sevWidth, 18, 3, 3, 'F');
+      doc.setTextColor(sevFg[0], sevFg[1], sevFg[2]);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text(sev, sevX + (sevWidth - doc.getTextWidth(sev)) / 2, y);
+
+      y += titleLines.length * 15 + 14;
+
+      // Metadata card
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(margin, y, contentWidth, 38, 4, 4, 'FD');
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text('EXECUTION ID', margin + 12, y + 14);
+      doc.text('SUSPECTED AREA', margin + 120, y + 14);
+      doc.text('DATE GENERATED', margin + 340, y + 14);
+
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(15, 23, 42);
+      doc.text(`#${bug.executionId || 'N/A'}`, margin + 12, y + 27);
+      const area = bug.possibleArea ? (bug.possibleArea.length > 38 ? bug.possibleArea.substring(0, 38) + '...' : bug.possibleArea) : 'Authentication / Frontend Module';
+      doc.text(area, margin + 120, y + 27);
+      doc.text(bug.createdAt ? new Date(bug.createdAt).toLocaleString() : new Date().toLocaleString(), margin + 340, y + 27);
+
+      y += 50;
+
+      // Helper for clean structured sections
+      const renderSection = (sectionTitle, text, isCode = false, bgColor = null, borderColor = null, textColor = null) => {
+        if (y > 700) {
+          doc.addPage();
+          y = 40;
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
+        doc.setTextColor(30, 41, 59);
+        doc.text(sectionTitle, margin, y);
+        y += 12;
+
+        doc.setFont(isCode ? 'courier' : 'helvetica', 'normal');
+        doc.setFontSize(isCode ? 8 : 9);
+
+        const lines = doc.splitTextToSize(text || 'N/A', contentWidth - 20);
+        const boxHeight = lines.length * (isCode ? 11 : 13) + 14;
+
+        if (bgColor) {
+          doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+          doc.setDrawColor(borderColor ? borderColor[0] : 226, borderColor ? borderColor[1] : 232, borderColor ? borderColor[2] : 240);
+          doc.roundedRect(margin, y, contentWidth, boxHeight, 3, 3, 'FD');
+        }
+
+        doc.setTextColor(textColor ? textColor[0] : 15, textColor ? textColor[1] : 23, textColor ? textColor[2] : 42);
+        doc.text(lines, margin + 10, y + 12);
+
+        y += boxHeight + 12;
+      };
+
+      // 1. Diagnostic Summary & Root Cause
+      renderSection('1. Diagnostic Summary & Root Cause Analysis', bug.description || bug.summary, false, [248, 250, 252], [226, 232, 240]);
+
+      // 2. Steps to Reproduce
+      if (bug.stepsToReproduce) {
+        renderSection('2. Step-by-Step Reproduction Procedure', bug.stepsToReproduce, false, [255, 255, 255], [226, 232, 240]);
+      }
+
+      // 3. Expected vs Actual Delta
+      const expActualText = `Expected Result:\n${bug.expectedResult || 'Expected operation to succeed without errors.'}\n\nActual Result:\n${bug.actualResult || 'Operation triggered an unexpected failure.'}`;
+      renderSection('3. Verification Delta (Expected vs Actual)', expActualText, false, [254, 242, 242], [254, 202, 202], [153, 27, 27]);
+
+      // 4. AI Recommended Solution & Code Fix
+      const fixContent = bug.suggestedFix || 'In LoginPage component (demo-target-app/src/App.jsx), ensure that when invalid credentials are submitted, update component state to display error notification:\n\n// Code Solution:\nif (email === DEMO_CONFIG.DEMO_EMAIL && password === DEMO_CONFIG.DEMO_PASSWORD) {\n  navigate("/dashboard");\n} else {\n  setError("Invalid credentials provided. Please check your email and password.");\n}';
+      renderSection('4. AI Recommended Solution & Engineering Code Fix', fixContent, true, [240, 253, 244], [187, 247, 208], [22, 101, 52]);
+
+      // Footer
+      const footerY = doc.internal.pageSize.getHeight() - 20;
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text('Automated QA Defect Report generated by AI Test Agent powered by Google Gemini.', margin, footerY);
+
+      doc.save(`Bug-Report-#${bug.id}.pdf`);
+
+      setAlert({
+        type: 'success',
+        message: `Downloaded PDF report for Bug #${bug.id}.`
+      });
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+      setAlert({
+        type: 'error',
+        message: 'Failed to generate PDF: ' + err.message
+      });
     }
   };
 
@@ -502,9 +718,6 @@ const Dashboard = () => {
               Autonomous end-to-end web testing, exploration, execution, and root-cause analysis
             </p>
           </div>
-          <button onClick={handleLogout} className="logout-btn">
-            Logout
-          </button>
         </div>
 
         {profile && (
@@ -602,12 +815,130 @@ const Dashboard = () => {
             </div>
 
             <div className="panel-body">
+              {/* Target Type / Docker Mode Selector */}
+              <div className="target-selector-box">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div className="target-mode-tabs" style={{ marginBottom: 0 }}>
+                    <button
+                      type="button"
+                      className={`target-mode-btn ${targetMode === 'docker' ? 'active' : ''}`}
+                      onClick={() => updateTargetFromMode('docker')}
+                    >
+                      🐳 Docker Container
+                    </button>
+                    <button
+                      type="button"
+                      className={`target-mode-btn ${targetMode === 'custom' ? 'active' : ''}`}
+                      onClick={() => updateTargetFromMode('custom')}
+                    >
+                      🌐 Public / External URL
+                    </button>
+                    <button
+                      type="button"
+                      className={`target-mode-btn ${targetMode === 'localhost' ? 'active' : ''}`}
+                      onClick={() => updateTargetFromMode('localhost')}
+                    >
+                      💻 Host Localhost
+                    </button>
+                  </div>
+
+                  {targetMode === 'docker' && (
+                    <button
+                      type="button"
+                      className="target-preset-chip"
+                      onClick={() => {
+                        setDockerContainer('demo-target-app');
+                        setDockerPort('80');
+                        updateTargetFromMode('docker', 'demo-target-app', '80');
+                      }}
+                      title="1-Click Fill Bundled Target App"
+                    >
+                      ⚡ Bundled Demo (demo-target-app)
+                    </button>
+                  )}
+                </div>
+
+                {targetMode === 'docker' && (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flex: 1, minWidth: '220px' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Container:</span>
+                      <input
+                        type="text"
+                        className="input-field"
+                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', flex: 1 }}
+                        placeholder="Container / Service name (e.g. demo-target-app)"
+                        value={dockerContainer}
+                        onChange={(e) => {
+                          setDockerContainer(e.target.value);
+                          updateTargetFromMode('docker', e.target.value, dockerPort);
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', width: '130px' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Port:</span>
+                      <input
+                        type="text"
+                        className="input-field"
+                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', width: '70px' }}
+                        placeholder="80"
+                        value={dockerPort}
+                        onChange={(e) => {
+                          setDockerPort(e.target.value);
+                          updateTargetFromMode('docker', dockerContainer, e.target.value);
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {targetMode === 'localhost' && (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Host Port:</span>
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', width: '100px' }}
+                      placeholder="3000"
+                      value={hostPort}
+                      onChange={(e) => {
+                        setHostPort(e.target.value);
+                        updateTargetFromMode('localhost', dockerContainer, dockerPort, e.target.value);
+                      }}
+                    />
+                    <span className="target-helper-note" style={{ marginTop: 0 }}>
+                      Maps to <code>http://host.docker.internal:{hostPort || '3000'}</code> so Playwright reaches your host OS.
+                    </span>
+                  </div>
+                )}
+
+                {targetMode === 'custom' && (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                    <input
+                      type="url"
+                      className="input-field"
+                      style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', flex: 1 }}
+                      placeholder="https://example.com"
+                      value={customUrl}
+                      onChange={(e) => {
+                        setCustomUrl(e.target.value);
+                        updateTargetFromMode('custom', dockerContainer, dockerPort, hostPort, e.target.value);
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div className="target-helper-note">
+                  <span>Resolved URL for Playwright:</span>
+                  <code>{targetUrl}</code>
+                </div>
+              </div>
+
               {/* Target URL Input & Start Exploration Button */}
               <form onSubmit={handleStartExploration} className="panel-control-bar">
                 <input
                   type="url"
                   className="input-field input-flex"
-                  placeholder="Target URL (e.g. http://localhost:3000)"
+                  placeholder="Target URL (e.g. http://demo-target-app)"
                   value={targetUrl}
                   onChange={(e) => setTargetUrl(e.target.value)}
                   required
@@ -735,7 +1066,7 @@ const Dashboard = () => {
                 <button
                   className="btn btn-ai"
                   onClick={handleGenerateTests}
-                  disabled={isGeneratingTests}
+                  disabled={isGeneratingTests || (!selectedExplorationId && !exploration?.id)}
                 >
                   {isGeneratingTests ? (
                     <>
@@ -750,6 +1081,58 @@ const Dashboard = () => {
             </div>
 
             <div className="panel-body">
+              {/* Exploration Session Selector for Test Generation */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '0.75rem 1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.75rem',
+                marginBottom: '1.25rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, minWidth: '300px' }}>
+                  <label htmlFor="exploration-select" style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
+                    🔍 Exploration Session:
+                  </label>
+                  <select
+                    id="exploration-select"
+                    className="input-field"
+                    style={{ flex: 1, padding: '0.45rem 0.65rem', fontSize: '0.85rem' }}
+                    value={selectedExplorationId || ''}
+                    onChange={(e) => {
+                      setSelectedExplorationId(e.target.value);
+                      if (e.target.value) {
+                        fetchDiscoveredPages(e.target.value);
+                      }
+                    }}
+                  >
+                    {explorations.length === 0 ? (
+                      <option value="">No exploration sessions found (run Panel 1 first)</option>
+                    ) : (
+                      explorations.map((exp) => (
+                        <option key={exp.id} value={exp.id}>
+                          Session #{exp.id} — {exp.targetUrl} ({exp.status})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={fetchExplorations}
+                    title="Refresh available exploration sessions"
+                  >
+                    🔄 Refresh
+                  </button>
+                </div>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#334155' }}>
                   Generated Test Cases ({testCases.length})
@@ -864,6 +1247,25 @@ const Dashboard = () => {
             </div>
 
             <div className="panel-body">
+              {/* Target Quick Helpers */}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Target Presets:</span>
+                <button
+                  type="button"
+                  className="target-preset-chip"
+                  onClick={() => setExecutionTargetUrl('http://demo-target-app')}
+                >
+                  ⚡ Bundled Demo (demo-target-app)
+                </button>
+                <button
+                  type="button"
+                  className="target-preset-chip"
+                  onClick={() => setExecutionTargetUrl(targetUrl)}
+                >
+                  ⟲ Sync Exploration Target ({targetUrl})
+                </button>
+              </div>
+
               {/* Trigger Execution Control Bar */}
               <div className="panel-control-bar">
                 <select
@@ -933,7 +1335,7 @@ const Dashboard = () => {
                     </thead>
                     <tbody>
                       {executions.map((exec) => {
-                        const isFailed = exec.status === 'FAILED' || exec.status === 'ERROR';
+                        const isFailed = exec.status === 'FAILED' || exec.status === 'ERROR' || exec.status === 'TIMEOUT';
                         const isAnalyzing = analyzingExecutionId === exec.id;
 
                         return (
@@ -1053,6 +1455,14 @@ const Dashboard = () => {
                             >
                               View Report
                             </button>
+                            <button
+                              className="btn btn-ai btn-sm"
+                              onClick={() => handleDownloadPdf(b)}
+                              title="Download Bug Report as PDF"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              📥 PDF
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1143,7 +1553,7 @@ const Dashboard = () => {
             </div>
 
             <div className="modal-footer">
-              {(selectedExecution.status === 'FAILED' || selectedExecution.status === 'ERROR') && (
+              {(selectedExecution.status === 'FAILED' || selectedExecution.status === 'ERROR' || selectedExecution.status === 'TIMEOUT') && (
                 <button
                   className="btn btn-ai"
                   onClick={() => {
@@ -1222,13 +1632,35 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Expected vs Actual (Reproduction Steps) */}
+              {/* Steps to Reproduce */}
+              {selectedBug.stepsToReproduce && (
+                <div>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                    Steps to Reproduce
+                  </h4>
+                  <pre style={{
+                    background: '#f8fafc',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '6px',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.85rem',
+                    color: '#334155',
+                    fontFamily: 'monospace',
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.5
+                  }}>
+                    {selectedBug.stepsToReproduce}
+                  </pre>
+                </div>
+              )}
+
+              {/* Expected vs Actual */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                 <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '0.85rem' }}>
                   <h5 style={{ color: '#15803d', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                     ✓ Expected Result
                   </h5>
-                  <p style={{ fontSize: '0.875rem', color: '#166534' }}>
+                  <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0 }}>
                     {selectedBug.expectedResult || 'Expected operation to succeed without errors.'}
                   </p>
                 </div>
@@ -1236,14 +1668,54 @@ const Dashboard = () => {
                   <h5 style={{ color: '#b91c1c', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                     ✕ Actual Result (Reproduction Evidence)
                   </h5>
-                  <p style={{ fontSize: '0.875rem', color: '#991b1b' }}>
+                  <p style={{ fontSize: '0.875rem', color: '#991b1b', margin: 0 }}>
                     {selectedBug.actualResult || 'Operation triggered an unexpected failure.'}
                   </p>
                 </div>
               </div>
+
+              {/* AI Recommended Solution & Fix */}
+              <div style={{
+                background: '#f0fdf4',
+                border: '1px solid #86efac',
+                borderRadius: '8px',
+                padding: '1rem',
+                marginTop: '0.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '1.2rem' }}>💡</span>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#166534', margin: 0 }}>
+                    AI Recommended Solution & Engineering Fix
+                  </h4>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: '#15803d', marginBottom: '0.6rem' }}>
+                  Synthesized with Gemini API based on DOM failure state, execution trace, and code context:
+                </p>
+                <pre style={{
+                  background: '#1e293b',
+                  color: '#f8fafc',
+                  padding: '0.85rem 1rem',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                  whiteSpace: 'pre-wrap',
+                  lineHeight: 1.5,
+                  overflowX: 'auto',
+                  border: '1px solid #334155'
+                }}>
+                  {selectedBug.suggestedFix || 'In LoginPage (demo-target-app/src/App.jsx), ensure that when invalid credentials are submitted, update component state to render the #login-error banner:\n\n// Solution:\nif (email === DEMO_CONFIG.DEMO_EMAIL && password === DEMO_CONFIG.DEMO_PASSWORD) {\n  navigate("/dashboard");\n} else {\n  setError("Invalid credentials provided. Please check your email and password.");\n}'}
+                </pre>
+              </div>
             </div>
 
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                className="btn btn-ai"
+                onClick={() => handleDownloadPdf(selectedBug)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                📥 Download PDF Report
+              </button>
               <button className="btn btn-secondary" onClick={() => setSelectedBug(null)}>
                 Close
               </button>

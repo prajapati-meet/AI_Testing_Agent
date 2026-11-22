@@ -37,7 +37,12 @@ public class BugReportService {
 
     @Transactional
     public BugReportResponse analyzeExecution(Long executionId) {
-        log.info("Starting AI bug analysis for execution #{}", executionId);
+        return analyzeExecution(executionId, null);
+    }
+
+    @Transactional
+    public BugReportResponse analyzeExecution(Long executionId, String userEmail) {
+        log.info("Starting AI bug analysis for execution #{}, user: {}", executionId, userEmail);
 
         ExecutionResponseDto execution = executionClient.getExecution(executionId).orElse(null);
         TestCaseDto testCase = null;
@@ -46,6 +51,9 @@ public class BugReportService {
         }
 
         BugReport bugReport = llmBugAnalysisService.analyzeFailure(executionId, execution, testCase);
+        if (userEmail != null && !userEmail.isBlank()) {
+            bugReport.setUserEmail(userEmail);
+        }
         BugReport saved = bugReportRepository.save(bugReport);
         log.info("Persisted AI bug report #{} for execution #{} with severity {}",
                 saved.getId(), executionId, saved.getSeverity());
@@ -55,22 +63,16 @@ public class BugReportService {
 
     @Transactional(readOnly = true)
     public List<BugReportResponse> getAllBugReports() {
-        List<BugReport> existing = bugReportRepository.findAll();
-        if (existing.isEmpty()) {
-            log.info("No bug reports found in bug_db. Providing fallback initial analysis.");
-            return List.of(new BugReportResponse(
-                    1L,
-                    1L,
-                    "Authentication Failure: Valid Credentials Rejected Under BUG_MODE",
-                    BugSeverity.HIGH,
-                    "Automated test execution failed during authentication workflow against demo-target-app. Although valid demo credentials were provided, the authentication form returned an unexpected error banner.",
-                    "1. Navigate to http://localhost:3000/login\n2. Enter valid email (test@example.com)\n3. Enter valid password (password123)\n4. Click Login\n5. Observe error banner displayed",
-                    "User should be authenticated and redirected to /dashboard.",
-                    "Login failed: Authentication service returned an unexpected error (BUG_MODE=true).",
-                    "Authentication Service / Login Component (demo-target-app / auth-service)",
-                    "screenshots/exec-1.png",
-                    LocalDateTime.now()
-            ));
+        return getAllBugReports(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BugReportResponse> getAllBugReports(String userEmail) {
+        List<BugReport> existing;
+        if (userEmail != null && !userEmail.isBlank()) {
+            existing = bugReportRepository.findByUserEmailOrderByCreatedAtDesc(userEmail);
+        } else {
+            existing = bugReportRepository.findAllByOrderByCreatedAtDesc();
         }
         return existing.stream().map(this::mapToResponse).toList();
     }
@@ -94,7 +96,8 @@ public class BugReportService {
                 entity.getActualResult(),
                 entity.getPossibleArea(),
                 entity.getEvidencePath(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getSuggestedFix()
         );
     }
 }

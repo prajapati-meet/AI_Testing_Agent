@@ -40,6 +40,11 @@ public class TestCaseService {
 
     @Transactional
     public List<TestCaseResponse> generateTestCases(GenerateTestsRequest request) {
+        return generateTestCases(request, null);
+    }
+
+    @Transactional
+    public List<TestCaseResponse> generateTestCases(GenerateTestsRequest request, String userEmail) {
         Long explorationId = request != null ? request.explorationId() : null;
         String targetUrl = request != null ? request.targetUrl() : null;
 
@@ -60,30 +65,39 @@ public class TestCaseService {
             targetUrl = "http://localhost:3000";
         }
 
-        log.info("Triggering AI test generation for target: {}, explorationId: {}, discovered pages: {}",
-                targetUrl, explorationId, pages.size());
+        log.info("Triggering AI test generation for target: {}, explorationId: {}, discovered pages: {}, user: {}",
+                targetUrl, explorationId, pages.size(), userEmail);
 
         List<TestCase> generatedCases = llmTestGenerationService.generateTestCases(
                 targetUrl, explorationId, exploration, pages
         );
 
+        if (userEmail != null && !userEmail.isBlank()) {
+            for (TestCase tc : generatedCases) {
+                tc.setUserEmail(userEmail);
+            }
+        }
+
         List<TestCase> saved = testCaseRepository.saveAll(generatedCases);
-        log.info("Persisted {} test cases with steps to test_db.", saved.size());
+        log.info("Persisted {} test cases with steps to test_db for user {}.", saved.size(), userEmail);
 
         return saved.stream().map(this::mapToResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<TestCaseResponse> getAllTestCases() {
-        List<TestCase> existing = testCaseRepository.findAll();
-        if (existing.isEmpty()) {
-            log.info("No test cases found in test_db. Generating fallback active scenarios.");
-            List<TestCase> defaults = llmTestGenerationService.generateDeterministicTestCases(
-                    "http://localhost:3000", null, null, Collections.emptyList()
-            );
-            return defaults.stream().map(this::mapToResponse).toList();
+        return getAllTestCases(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TestCaseResponse> getAllTestCases(String userEmail) {
+        List<TestCase> list;
+        if (userEmail != null && !userEmail.isBlank()) {
+            list = testCaseRepository.findByUserEmailOrderByCreatedAtDesc(userEmail);
+        } else {
+            list = testCaseRepository.findAllByOrderByCreatedAtDesc();
         }
-        return existing.stream().map(this::mapToResponse).toList();
+        return list.stream().map(this::mapToResponse).toList();
     }
 
     @Transactional(readOnly = true)

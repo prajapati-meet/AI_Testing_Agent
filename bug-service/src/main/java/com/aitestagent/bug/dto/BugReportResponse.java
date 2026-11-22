@@ -18,8 +18,26 @@ public record BugReportResponse(
         String actualResult,
         String possibleArea,
         String evidencePath,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String suggestedFix
 ) {
+    // Secondary constructor for backward compatibility with 11-parameter callers
+    public BugReportResponse(
+            Long id,
+            Long executionId,
+            String title,
+            BugSeverity severity,
+            String description,
+            String stepsToReproduce,
+            String expectedResult,
+            String actualResult,
+            String possibleArea,
+            String evidencePath,
+            LocalDateTime createdAt
+    ) {
+        this(id, executionId, title, severity, description, stepsToReproduce, expectedResult, actualResult, possibleArea, evidencePath, createdAt, null);
+    }
+
     // Secondary constructor for backward compatibility with 9-parameter signatures
     public BugReportResponse(
             Long id,
@@ -32,7 +50,7 @@ public record BugReportResponse(
             String possibleArea,
             LocalDateTime createdAt
     ) {
-        this(id, executionId, title, severity, description, "", expectedResult, actualResult, possibleArea, null, createdAt);
+        this(id, executionId, title, severity, description, "", expectedResult, actualResult, possibleArea, null, createdAt, null);
     }
 
     // Alias for summary if any existing frontend/client reads summary

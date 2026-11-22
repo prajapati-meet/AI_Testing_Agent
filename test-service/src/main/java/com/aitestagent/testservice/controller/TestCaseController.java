@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.RequestHeader;
+
 import java.util.List;
 
 @RestController
@@ -26,13 +28,15 @@ public class TestCaseController {
 
     @PostMapping("/generate")
     public ResponseEntity<List<TestCaseResponse>> generateTests(
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
             @RequestBody(required = false) GenerateTestsRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(testCaseService.generateTestCases(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(testCaseService.generateTestCases(request, userEmail));
     }
 
     @GetMapping
-    public ResponseEntity<List<TestCaseResponse>> getAllTests() {
-        return ResponseEntity.ok(testCaseService.getAllTestCases());
+    public ResponseEntity<List<TestCaseResponse>> getAllTests(
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail) {
+        return ResponseEntity.ok(testCaseService.getAllTestCases(userEmail));
     }
 
     @GetMapping("/{id}")

@@ -34,6 +34,10 @@ public class ExplorationService {
      * then fires the actual Playwright crawl asynchronously in the background.
      */
     public ExplorationResponse startExploration(StartExplorationRequest request) {
+        return startExploration(request, null);
+    }
+
+    public ExplorationResponse startExploration(StartExplorationRequest request, String userEmail) {
         String targetUrl = (request != null && request.targetUrl() != null)
                 ? request.targetUrl().trim()
                 : "http://localhost:3000";
@@ -42,12 +46,27 @@ public class ExplorationService {
         exploration.setTargetUrl(targetUrl);
         exploration.setStatus(ExplorationStatus.PENDING);
         exploration.setStartedAt(LocalDateTime.now());
+        exploration.setUserEmail(userEmail);
         Exploration saved = explorationRepository.save(exploration);
 
         // Fire-and-forget: the crawl runs in a dedicated thread pool
         asyncCrawlService.executeCrawl(saved.getId());
 
         return toResponse(saved, "Exploration started — crawling in progress.");
+    }
+
+    public List<ExplorationResponse> getAllExplorations() {
+        return getAllExplorations(null);
+    }
+
+    public List<ExplorationResponse> getAllExplorations(String userEmail) {
+        List<Exploration> list;
+        if (userEmail != null && !userEmail.isBlank()) {
+            list = explorationRepository.findByUserEmailOrderByStartedAtDesc(userEmail);
+        } else {
+            list = explorationRepository.findAllByOrderByStartedAtDesc();
+        }
+        return list.stream().map(e -> toResponse(e, "Exploration summary")).toList();
     }
 
     /**

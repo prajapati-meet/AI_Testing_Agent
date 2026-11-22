@@ -37,6 +37,9 @@ public class TestCase {
     @Column(columnDefinition = "TEXT")
     private String expectedResult;
 
+    @Column(name = "user_email")
+    private String userEmail;
+
     @Column(length = 2048)
     private String targetUrl;
 
@@ -108,6 +111,14 @@ public class TestCase {
     }
 
     // Getters and Setters
+
+    public String getUserEmail() {
+        return userEmail;
+    }
+
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
+    }
 
     public Long getId() {
         return id;

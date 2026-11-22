@@ -37,6 +37,9 @@ public class Exploration {
      * This is the field that will eventually be sent to the LLM for test generation.
      * Stored as TEXT to accommodate large summaries.
      */
+    @Column(name = "user_email")
+    private String userEmail;
+
     @Column(columnDefinition = "TEXT")
     private String navigationFlowSummary;
 
@@ -59,6 +62,14 @@ public class Exploration {
         if (this.status == null) {
             this.status = ExplorationStatus.PENDING;
         }
+    }
+
+    public String getUserEmail() {
+        return userEmail;
+    }
+
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
     }
 
     public Long getId() {

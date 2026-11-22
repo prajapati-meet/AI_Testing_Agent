@@ -133,10 +133,14 @@ public class LlmTestGenerationService {
         sb.append("3. Input validation flow (e.g. Missing required fields)\n");
         sb.append("\nStrict Rules for TestStep actions:\n");
         sb.append("- action MUST be one of: NAVIGATE, FILL, CLICK, WAIT, ASSERT_VISIBLE, ASSERT_TEXT\n");
-        sb.append("- target: CSS selector (e.g. #email, button#login-submit, .error-message) or URL for NAVIGATE\n");
+        sb.append("- target: For NAVIGATE, target is the destination URL (e.g. ").append(targetUrl).append("). For ALL OTHER ACTIONS (FILL, CLICK, WAIT, ASSERT_VISIBLE, ASSERT_TEXT), target MUST BE A VALID DOM CSS SELECTOR (e.g. #email, button#login-submit, #login-error, .error-banner, #dashboard-container, nav, main, body, h1). NEVER use a URL in target for non-NAVIGATE actions!\n");
         sb.append("- value: input text for FILL, expected text for ASSERT_TEXT, milliseconds for WAIT, or empty string\n");
         sb.append("- condition: optional condition or empty string\n");
         sb.append("- stepOrder: 1-based sequential integer\n");
+        sb.append("- CRITICAL ASSERTION RULES FOR STEP VERIFICATION:\n");
+        sb.append("  * For Happy Path login: The final step MUST ASSERT_VISIBLE on an authenticated element like '#dashboard-container', 'button#logout-button', or 'h2'.\n");
+        sb.append("  * For Negative defect detection flow (Invalid Credentials): The final step MUST ASSERT_VISIBLE on the error feedback element '#login-error' or '.error-banner' (which is expected to show an error message). NEVER assert '#email' or 'button#login-submit' for invalid credentials, because those are always visible and would mask bugs!\n");
+        sb.append("  * For Missing Required Fields: The final step can ASSERT_VISIBLE on ':invalid', 'input:invalid', or '.error'.\n");
         sb.append("\nReturn ONLY a JSON array matching this exact schema without any markdown formatting:\n");
         sb.append("[\n");
         sb.append("  {\n");
@@ -148,7 +152,35 @@ public class LlmTestGenerationService {
         sb.append("      {\n");
         sb.append("        \"stepOrder\": 1,\n");
         sb.append("        \"action\": \"NAVIGATE\",\n");
-        sb.append("        \"target\": \"").append(targetUrl).append("\",\n");
+        sb.append("        \"target\": \"").append(targetUrl).append("/login\",\n");
+        sb.append("        \"value\": \"\",\n");
+        sb.append("        \"condition\": \"\"\n");
+        sb.append("      },\n");
+        sb.append("      {\n");
+        sb.append("        \"stepOrder\": 2,\n");
+        sb.append("        \"action\": \"FILL\",\n");
+        sb.append("        \"target\": \"#email\",\n");
+        sb.append("        \"value\": \"test@example.com\",\n");
+        sb.append("        \"condition\": \"\"\n");
+        sb.append("      },\n");
+        sb.append("      {\n");
+        sb.append("        \"stepOrder\": 3,\n");
+        sb.append("        \"action\": \"FILL\",\n");
+        sb.append("        \"target\": \"#password\",\n");
+        sb.append("        \"value\": \"password123\",\n");
+        sb.append("        \"condition\": \"\"\n");
+        sb.append("      },\n");
+        sb.append("      {\n");
+        sb.append("        \"stepOrder\": 4,\n");
+        sb.append("        \"action\": \"CLICK\",\n");
+        sb.append("        \"target\": \"button#login-submit\",\n");
+        sb.append("        \"value\": \"\",\n");
+        sb.append("        \"condition\": \"\"\n");
+        sb.append("      },\n");
+        sb.append("      {\n");
+        sb.append("        \"stepOrder\": 5,\n");
+        sb.append("        \"action\": \"ASSERT_VISIBLE\",\n");
+        sb.append("        \"target\": \"#dashboard-container\",\n");
         sb.append("        \"value\": \"\",\n");
         sb.append("        \"condition\": \"\"\n");
         sb.append("      }\n");
@@ -165,9 +197,12 @@ public class LlmTestGenerationService {
         // Check if Gemini API
         if (effectiveEndpoint.contains("generativelanguage.googleapis.com") ||
                 (effectiveEndpoint.isEmpty() && model != null && model.toLowerCase().contains("gemini"))) {
+            String cleanModel = (model != null && !model.isBlank())
+                    ? model.trim().toLowerCase().replaceAll("\\s+", "-").replace("models/", "")
+                    : "gemini-3.5-flash-lite";
             String geminiUrl = !effectiveEndpoint.isEmpty()
                     ? effectiveEndpoint
-                    : "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + apiKey;
+                    : "https://generativelanguage.googleapis.com/v1beta/models/" + cleanModel + ":generateContent?key=" + apiKey;
 
             Map<String, Object> payload = Map.of(
                     "contents", List.of(
@@ -181,14 +216,32 @@ public class LlmTestGenerationService {
                     )
             );
 
-            String responseBody = restClient.post()
-                    .uri(geminiUrl)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(payload)
-                    .retrieve()
-                    .body(String.class);
+            Exception lastEx = null;
+            for (int attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    String responseBody = restClient.post()
+                            .uri(geminiUrl)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(payload)
+                            .retrieve()
+                            .body(String.class);
 
-            return extractGeminiText(responseBody);
+                    return extractGeminiText(responseBody);
+                } catch (Exception ex) {
+                    lastEx = ex;
+                    log.warn("Gemini test generation attempt #{} failed: {}. Retrying in {}ms...",
+                            attempt, ex.getMessage(), attempt * 1500);
+                    try {
+                        Thread.sleep(attempt * 1500L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+            if (lastEx != null) {
+                throw new RuntimeException("Gemini test generation failed after retries: " + lastEx.getMessage(), lastEx);
+            }
+            return "";
         } else {
             // OpenAI compatible chat completions endpoint
             String openAiUrl = !effectiveEndpoint.isEmpty()
@@ -287,12 +340,31 @@ public class LlmTestGenerationService {
                     String value = stepDto.value() != null ? stepDto.value().trim() : "";
                     String condition = stepDto.condition() != null ? stepDto.condition().trim() : "";
 
+                    // Guardrail: if an LLM mistakenly passed a URL as target for ASSERT_VISIBLE or ASSERT_TEXT
+                    if (action != StepAction.NAVIGATE && (target.startsWith("http://") || target.startsWith("https://"))) {
+                        log.warn("Detected invalid URL '{}' as target for action {}. Sanitizing to 'body, main, header'.", target, action);
+                        target = "body, main, header, h1";
+                    }
+
                     TestStep step = new TestStep(order++, action, target, value, condition);
                     tc.addStep(step);
                 }
             }
 
             if (!tc.getSteps().isEmpty()) {
+                // Defect detection guardrail: Ensure negative / invalid credentials flows verify the error banner (#login-error),
+                // not input fields (#email) or submit buttons which remain visible regardless of error state.
+                String tcNameLower = tc.getName() != null ? tc.getName().toLowerCase() : "";
+                if (tcNameLower.contains("invalid") || tcNameLower.contains("negative") || tcNameLower.contains("defect") || tcNameLower.contains("bad")) {
+                    TestStep lastStep = tc.getSteps().get(tc.getSteps().size() - 1);
+                    if (lastStep.getAction() == StepAction.ASSERT_VISIBLE || lastStep.getAction() == StepAction.ASSERT_TEXT) {
+                        String tgt = lastStep.getTarget() != null ? lastStep.getTarget().trim() : "";
+                        if (tgt.equals("#email") || tgt.equals("#password") || tgt.contains("button#login-submit") || tgt.equals("form")) {
+                            log.info("Refining negative test case assertion from '{}' to '#login-error, .error-banner' for accurate defect verification.", tgt);
+                            lastStep.setTarget("#login-error, .error-banner");
+                        }
+                    }
+                }
                 testCases.add(tc);
             }
         }
@@ -366,7 +438,7 @@ public class LlmTestGenerationService {
         invalidLogin.addStep(new TestStep(3, StepAction.FILL, passwordSelector, "incorrect_password_999", ""));
         invalidLogin.addStep(new TestStep(4, StepAction.CLICK, submitSelector, "", ""));
         invalidLogin.addStep(new TestStep(5, StepAction.WAIT, "body", "1500", ""));
-        invalidLogin.addStep(new TestStep(6, StepAction.ASSERT_VISIBLE, ".error-message, .alert, .error, [role='alert'], .text-danger", "", ""));
+        invalidLogin.addStep(new TestStep(6, StepAction.ASSERT_VISIBLE, "#login-error, .error-banner, .error-message, .alert, .error, [role='alert'], .text-danger", "", ""));
         results.add(invalidLogin);
 
         // --- Scenario 3: Required Field Validation (Boundary / Negative) ---

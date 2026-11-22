@@ -48,6 +48,11 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
             String token = authHeader.substring(7);
             try {
                 jwtUtil.validateToken(token);
+                String email = jwtUtil.extractEmail(token);
+                ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                        .header("X-User-Email", email != null ? email : "")
+                        .build();
+                return chain.filter(exchange.mutate().request(mutatedRequest).build());
             } catch (Exception e) {
                 return this.onError(exchange, HttpStatus.UNAUTHORIZED);
             }

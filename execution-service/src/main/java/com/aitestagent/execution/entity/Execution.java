@@ -38,6 +38,9 @@ public class Execution {
     @Column(length = 1000)
     private String errorMessage;
 
+    @Column(name = "user_email")
+    private String userEmail;
+
     private String screenshotPath;
 
     @Column(name = "failed_step")
@@ -73,6 +76,14 @@ public class Execution {
         if (this.status == null) {
             this.status = ExecutionStatus.PENDING;
         }
+    }
+
+    public String getUserEmail() {
+        return userEmail;
+    }
+
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
     }
 
     public Long getId() {

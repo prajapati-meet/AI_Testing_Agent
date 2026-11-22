@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.RequestHeader;
+
 import java.util.List;
 
 @RestController
@@ -23,13 +25,16 @@ public class BugReportController {
     }
 
     @PostMapping("/analyze/{executionId}")
-    public ResponseEntity<BugReportResponse> analyzeExecution(@PathVariable Long executionId) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(bugReportService.analyzeExecution(executionId));
+    public ResponseEntity<BugReportResponse> analyzeExecution(
+            @PathVariable Long executionId,
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(bugReportService.analyzeExecution(executionId, userEmail));
     }
 
     @GetMapping
-    public ResponseEntity<List<BugReportResponse>> getAllBugs() {
-        return ResponseEntity.ok(bugReportService.getAllBugReports());
+    public ResponseEntity<List<BugReportResponse>> getAllBugs(
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail) {
+        return ResponseEntity.ok(bugReportService.getAllBugReports(userEmail));
     }
 
     @GetMapping("/{id}")

@@ -15,7 +15,7 @@ function HomePage() {
   );
 }
 
-function LoginPage({ bugMode }) {
+function LoginPage({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -25,15 +25,15 @@ function LoginPage({ bugMode }) {
     e.preventDefault();
     setError('');
 
-    if (bugMode) {
-      setError('Login failed: Authentication service returned an unexpected error (BUG_MODE=true).');
-      return;
-    }
-
     if (email === DEMO_CONFIG.DEMO_EMAIL && password === DEMO_CONFIG.DEMO_PASSWORD) {
+      if (onLoginSuccess) onLoginSuccess();
       navigate('/dashboard');
     } else {
-      setError('Invalid email or password. Use test@example.com / password123.');
+      // REAL BUG (Defect #DEF-AUTH-401):
+      // When invalid credentials are submitted, the application fails to display
+      // the error banner (#login-error) due to a missing state update (Silent Failure).
+      // The user receives zero visual feedback explaining why login was rejected.
+      console.warn('[AUTH] Login rejected: Invalid credentials provided for ' + email);
     }
   };
 
@@ -71,11 +71,23 @@ function LoginPage({ bugMode }) {
   );
 }
 
-function DashboardPage() {
+function DashboardPage({ onLogout }) {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    if (onLogout) onLogout();
+    navigate('/login');
+  };
+
   return (
-    <div className="page">
+    <div id="dashboard-container" className="page dashboard-container">
       <h2>Customer Account Dashboard</h2>
       <p>Welcome back, <strong>{DEMO_CONFIG.DEMO_EMAIL}</strong>! Login succeeded.</p>
+      <div style={{ marginTop: '1.5rem' }}>
+        <button id="logout-button" className="btn secondary" onClick={handleLogout}>
+          Sign Out / Logout
+        </button>
+      </div>
     </div>
   );
 }
@@ -112,41 +124,64 @@ function CheckoutPage() {
   );
 }
 
-function App() {
-  const [bugMode, setBugMode] = useState(DEMO_CONFIG.BUG_MODE);
+function AppContent() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    navigate('/login');
+  };
 
   return (
-    <Router>
-      <div className="target-app">
-        <header className="header">
-          <div className="logo">DemoShop (Target App :3000)</div>
-          <nav className="nav">
-            <Link to="/">Home</Link>
+    <div className="target-app">
+      <header className="header">
+        <div className="logo">DemoShop (Target App :3000)</div>
+        <nav className="nav">
+          <Link to="/">Home</Link>
+          {!isLoggedIn ? (
             <Link to="/login">Login</Link>
-            <Link to="/dashboard">Dashboard</Link>
-            <Link to="/products">Products</Link>
-            <Link to="/cart">Cart</Link>
-            <Link to="/checkout">Checkout</Link>
-          </nav>
-          <button
-            type="button"
-            className={`bug-toggle ${bugMode ? 'active' : ''}`}
-            onClick={() => setBugMode((prev) => !prev)}
-          >
-            BUG_MODE={String(bugMode)}
-          </button>
-        </header>
-        <main className="container">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<LoginPage bugMode={bugMode} />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/products" element={<ProductsPage />} />
-            <Route path="/cart" element={<CartPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-          </Routes>
-        </main>
-      </div>
+          ) : (
+            <button
+              id="header-logout-btn"
+              onClick={handleLogout}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+                font: 'inherit',
+                padding: '0 0.5rem',
+                textDecoration: 'underline'
+              }}
+            >
+              Logout
+            </button>
+          )}
+          <Link to="/dashboard">Dashboard</Link>
+          <Link to="/products">Products</Link>
+          <Link to="/cart">Cart</Link>
+          <Link to="/checkout">Checkout</Link>
+        </nav>
+      </header>
+      <main className="container">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage onLoginSuccess={() => setIsLoggedIn(true)} />} />
+          <Route path="/dashboard" element={<DashboardPage onLogout={() => setIsLoggedIn(false)} />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }

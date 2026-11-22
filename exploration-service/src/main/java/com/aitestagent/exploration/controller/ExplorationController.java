@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.RequestHeader;
+
 import java.util.List;
 
 @RestController
@@ -27,8 +29,15 @@ public class ExplorationController {
 
     @PostMapping("/start")
     public ResponseEntity<ExplorationResponse> startExploration(
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
             @RequestBody(required = false) StartExplorationRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(explorationService.startExploration(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(explorationService.startExploration(request, userEmail));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<ExplorationResponse>> getAllExplorations(
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail) {
+        return ResponseEntity.ok(explorationService.getAllExplorations(userEmail));
     }
 
     @GetMapping("/{id}")

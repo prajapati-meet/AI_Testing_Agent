@@ -48,6 +48,10 @@ public class ExecutionService {
     }
 
     public ExecutionResponse triggerExecution(ExecutionRequest request) {
+        return triggerExecution(request, null);
+    }
+
+    public ExecutionResponse triggerExecution(ExecutionRequest request, String userEmail) {
         Long testCaseId = (request != null && request.testCaseId() != null) ? request.testCaseId() : 1L;
         String targetUrl = (request != null && request.targetUrl() != null && !request.targetUrl().isBlank())
                 ? request.targetUrl().trim()
@@ -58,6 +62,7 @@ public class ExecutionService {
         execution.setTargetUrl(targetUrl);
         execution.setStatus(ExecutionStatus.PENDING);
         execution.setStartedAt(LocalDateTime.now());
+        execution.setUserEmail(userEmail);
 
         Execution saved = executionRepository.save(execution);
 
@@ -71,19 +76,15 @@ public class ExecutionService {
     }
 
     public List<ExecutionResponse> getAllExecutions() {
-        List<Execution> existing = executionRepository.findAll();
-        if (existing.isEmpty()) {
-            return List.of(new ExecutionResponse(
-                    1L,
-                    1L,
-                    "http://localhost:3000",
-                    ExecutionStatus.PASSED,
-                    LocalDateTime.now().minusMinutes(1),
-                    LocalDateTime.now(),
-                    null,
-                    null,
-                    null
-            ));
+        return getAllExecutions(null);
+    }
+
+    public List<ExecutionResponse> getAllExecutions(String userEmail) {
+        List<Execution> existing;
+        if (userEmail != null && !userEmail.isBlank()) {
+            existing = executionRepository.findByUserEmailOrderByStartedAtDesc(userEmail);
+        } else {
+            existing = executionRepository.findAllByOrderByStartedAtDesc();
         }
         return existing.stream().map(this::mapToResponse).toList();
     }
